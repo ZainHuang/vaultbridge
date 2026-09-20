@@ -1,6 +1,6 @@
 {
   "name": "vaultbridge",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "private": true,
   "description": "Stateful multi-device sync for Obsidian via GitHub, with three-way sync, conflict protection, recovery, and verification.",
   "type": "module",
@@ -26,6 +26,7 @@
     "test:obsidian:dashboard": "node scripts/obsidian-v1-smoke.mjs --dashboard",
     "test:obsidian:publish": "node scripts/obsidian-v1-smoke.mjs --publish",
     "test:obsidian:manifest": "node scripts/obsidian-v1-smoke.mjs --manifest",
+    "test:obsidian:keyboard": "node scripts/obsidian-v1-smoke.mjs --keyboard",
     "audit:public": "node scripts/audit-public.mjs"
   },
   "dependencies": {

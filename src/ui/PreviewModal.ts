@@ -1,9 +1,10 @@
 import { Modal, type App } from 'obsidian';
 import { PreviewError, safeError } from '../errors';
 import { recoveryActions, type RecoveryAction } from './RecoveryUI';
+import { keepModalAboveKeyboard } from './MobileModalViewport';
 import type { RepositoryTarget } from '../github/types';
 import type { SyncDecision, ThreeWayPlan } from '../sync/planner/SyncDecision';
-import { PREVIEW_GROUPS, decisionGroup, previewGroups, canExecutePreview, type PreviewGroup } from './PreviewModel';
+import { PREVIEW_GROUPS, decisionGroup, previewGroups, canExecutePreview, repositoryBlocked, type PreviewGroup } from './PreviewModel';
 import type { Progress } from '../vault/VaultScanner';
 import type { StatefulPreviewResult } from '../sync/StatefulPreviewService';
 import type { SyncPreview } from '../sync/execution/SyncService';
@@ -29,6 +30,7 @@ export class PreviewModal extends Modal {
   private countEl!: HTMLElement;
   private result?: SyncPreview;
   private executing = false;
+  private releaseViewport?: () => void;
 
   constructor(app: App, private readonly target: RepositoryTarget & { deleteSafetyThreshold?: number }, private readonly run: RunPreview, private readonly actions?: SyncActions,
     private readonly recover?: (action?: RecoveryAction) => void) { super(app); }
@@ -36,10 +38,12 @@ export class PreviewModal extends Modal {
   onOpen(): void {
     this.modalEl.addClass('lms-modal');
     this.setTitle('VaultBridge');
+    this.releaseViewport = keepModalAboveKeyboard(this);
     void this.load();
   }
 
   onClose(): void {
+    this.releaseViewport?.();
     if (!this.executing) this.controller?.abort();
     this.contentEl.empty();
   }
@@ -60,6 +64,7 @@ export class PreviewModal extends Modal {
     const controller = new AbortController();
     this.controller = controller;
     this.plan = undefined;
+    this.result = undefined;
     this.filter = 'ALL'; this.query = ''; this.page = 0;
     this.header();
     const status = this.contentEl.createEl('p', { text: 'Preparing Preview…', cls: 'lms-status', attr: { role: 'status', 'aria-live': 'polite' } });
@@ -77,6 +82,7 @@ export class PreviewModal extends Modal {
       this.contentEl.createEl('p', { text: 'Preview unavailable', cls: 'lms-error', attr: { role: 'alert' } });
       this.contentEl.createEl('p', { text: safeError(error), cls: 'lms-wrap' });
       this.contentEl.createEl('p', { text: 'No partial plan was generated. Local files and GitHub were not changed.', cls: 'lms-muted' });
+      if (error instanceof PreviewError && error.code === 'REMOTE_MANIFEST_INVALID') this.reviewGuidance();
       const open = this.recover ?? this.actions?.recover;
       if (error instanceof PreviewError && error.code === 'RECOVERY_REQUIRED' && open) recoveryActions(this.contentEl, open);
       else {
@@ -84,6 +90,10 @@ export class PreviewModal extends Modal {
         retry.onclick = () => { void this.load(); };
       }
     }
+  }
+
+  private reviewGuidance(): void {
+    this.contentEl.createEl('p', { text: 'Review / Repair required: review the diagnostics against the pinned GitHub Tree, Manifest and device state. Back up the current HEAD and Manifest before an explicitly reviewed repair, then verify consistency and refresh Preview. No executable file plan is available.', cls: 'lms-repair-guidance lms-muted' });
   }
 
   private renderPlan(result: StatefulPreviewResult): void {
@@ -97,6 +107,18 @@ export class PreviewModal extends Modal {
     device.createEl('p', { text: `Device: ${result.state.deviceId}`, cls: 'lms-head' });
     device.createEl('p', { text: `Base generation: ${result.state.baseManifest?.generation ?? 'No sync history'} · Remote generation: ${plan.remoteGeneration ?? 'No manifest'}`, cls: 'lms-wrap' });
     device.createEl('p', { text: `Local files: ${plan.localCount} · Remote files: ${plan.remoteCount}` });
+    if (repositoryBlocked(plan) || this.result?.mode === 'BLOCKED') {
+      const banner = el.createDiv({ cls: 'lms-blocking-banner', attr: { role: 'alert' } });
+      banner.createEl('strong', { text: plan.status, cls: 'lms-gate-code' });
+      if (plan.reason) banner.createEl('p', { text: plan.reason });
+      el.createEl('p', { text: `HEAD ${plan.remoteHeadSha}`, cls: 'lms-head' });
+      this.reviewGuidance();
+      const footer = el.createDiv({ cls: 'lms-footer' });
+      if (this.actions) footer.createEl('button', { text: 'Sync & Verify', cls: 'mod-cta lms-execute' }).disabled = true;
+      footer.createEl('button', { text: 'Refresh Preview' }).onclick = () => { void this.load(); };
+      footer.createEl('button', { text: 'Close' }).onclick = () => this.close();
+      return;
+    }
     if (this.result) {
       const messages: Record<string, string> = {
         INITIALIZE: 'Initialize GitHub: create the first Manifest from local files.',
@@ -125,7 +147,7 @@ export class PreviewModal extends Modal {
         } else el.createEl('p', { text: 'Choose a side to review additions, overwrites and removals. Execution requires typed confirmation.', cls: 'lms-muted' });
       }
     }
-    if (plan.status !== 'READY' && (!this.result || this.result.mode === 'BLOCKED')) {
+    if (plan.status !== 'READY' && !this.result) {
       const bootstrap = plan.status === 'BOOTSTRAP_FROM_REMOTE' || plan.status === 'INITIALIZE_REMOTE_FROM_LOCAL';
       const banner = el.createDiv({ cls: bootstrap ? 'lms-status' : 'lms-blocking-banner', attr: { role: bootstrap ? 'status' : 'alert' } });
       banner.createEl('strong', { text: plan.status, cls: 'lms-gate-code' });
@@ -156,7 +178,8 @@ export class PreviewModal extends Modal {
     if (this.result && this.actions) {
       const prepared = this.result;
       let confirmation: HTMLInputElement | undefined;
-      const requiredConfirmation = prepared.adoptionChoice ? `USE ${prepared.adoptionChoice.toUpperCase()}` : prepared.requiresDeleteConfirmation ? `DELETE ${prepared.deletions}` : '';
+      const requiredConfirmation = !canExecutePreview(prepared) ? '' : prepared.adoptionChoice ? `USE ${prepared.adoptionChoice.toUpperCase()}`
+        : prepared.requiresDeleteConfirmation && prepared.deletions > (this.target.deleteSafetyThreshold ?? 20) ? `DELETE ${prepared.deletions}` : '';
       if (requiredConfirmation) {
         const label = el.createEl('label', { text: prepared.adoptionChoice ? `Type ${requiredConfirmation} to confirm the adoption impact above` : `Type ${requiredConfirmation} to approve removed paths (including rename sources)`, cls: 'lms-search-label' });
         footer.before(label);

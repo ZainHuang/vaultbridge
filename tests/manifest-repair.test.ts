@@ -46,6 +46,61 @@ describe('Read-only remote provenance audit', () => {
   });
 });
 describe('Explicit manifest-only repair with retained backup and journal', () => {
+  it('registers an explicitly reviewed remote addition without merging an identical existing identity; Windows and new-device Bootstrap converge', async () => {
+    const f = fixture();
+    f.remote.external({ 'A.md': 'original', 'copy/A.md': 'original', [MANIFEST_PATH]: JSON.stringify(f.old), '.obsidian/config.json': 'protected' });
+    const head = f.remote.head; const before = { ...f.remote.contents() };
+    const additions = [{ path: 'copy/A.md', blobSha: before['copy/A.md']!, fileId: 'reviewed-copy-id' }];
+    const result = await f.repair.repair(head, additions);
+    const manifest = JSON.parse(f.remote.text(MANIFEST_PATH));
+    expect(manifest.generation).toBe(2);
+    expect(manifest.files['id-1']).toEqual(f.old.files['id-1']);
+    expect(manifest.files['reviewed-copy-id']).toEqual({ ...additions[0], deleted: false, revision: 1 });
+    expect(f.remote.contents()).toEqual({ ...before, [MANIFEST_PATH]: expect.any(String) });
+    expect(f.remote.refs.get(result.backupRef)).toBe(head);
+    expect((await f.repair.repair(head, additions)).head).toBe(result.head);
+    expect(f.remote.calls.filter(c => c.method === 'POST' && c.resource === 'commits')).toHaveLength(1);
+    for (const initial of [{ 'A.md': 'original' }, {}] as Record<string, string>[]) {
+      const vault = new WritableVault(initial);
+      const state = new LocalStateStore({ read: () => vault.readInternal('state'), write: text => vault.writeInternal('state', text) }); await state.load();
+      if (Object.keys(initial).length) await state.save({ ...state.current(), target, baseManifest: f.old, baseRemoteCommit: f.origin });
+      const service = new SyncService(vault, f.remote.transport, '.obsidian', state);
+      const preview = await service.preview(options, 'fixture');
+      expect(preview.mode).toBe(Object.keys(initial).length ? 'SYNC' : 'BOOTSTRAP');
+      expect(preview.canExecute).toBe(true); expect(preview.requiresDeleteConfirmation).toBe(false);
+      await service.execute(preview, 'fixture');
+      expect(state.current().baseManifest).toEqual(manifest);
+      expect(vault.files.get('copy/A.md')).toEqual(bytes('original'));
+      expect(vault.files.get('A.md')).toEqual(bytes('original'));
+    }
+  });
+  it.each(['wrong-sha', 'missing-review', 'extra-review', 'existing-id'])('rejects unsafe registration %s before any write', async variant => {
+    const f = fixture(); f.remote.external({ 'A.md': 'original', 'copy.md': 'copy', [MANIFEST_PATH]: JSON.stringify(f.old) });
+    const additions = [{ path: 'copy.md', blobSha: f.remote.contents()['copy.md']!, fileId: 'new-id' }];
+    if (variant === 'wrong-sha') additions[0]!.blobSha = 'a'.repeat(40);
+    if (variant === 'missing-review') additions.length = 0;
+    if (variant === 'extra-review') additions.push({ path: 'other.md', blobSha: 'a'.repeat(40), fileId: 'other-id' });
+    if (variant === 'existing-id') additions[0]!.fileId = 'id-1';
+    await expect(f.repair.repair(f.remote.head, additions)).rejects.toThrow();
+    expect(f.remote.calls.every(c => c.method === 'GET')).toBe(true); expect(f.saved()).toBeNull();
+  });
+  it('does not treat a missing tracked path plus an untracked path as an additive repair', async () => {
+    const f = fixture(); f.remote.external({ 'renamed.md': 'original', [MANIFEST_PATH]: JSON.stringify(f.old) });
+    await expect(f.repair.repair(f.remote.head, [{ path: 'renamed.md', blobSha: f.remote.contents()['renamed.md']!, fileId: 'new-id' }])).rejects.toThrow();
+    expect(f.remote.calls.every(c => c.method === 'GET')).toBe(true);
+  });
+  it('blocked repository preview never fabricates deletion impact from untracked paths and local-only files', async () => {
+    const f = fixture();
+    f.remote.external({ 'A.md': 'original', ...Object.fromEntries(Array.from({ length: 4 }, (_, i) => [`remote-${i}.md`, 'remote'])), [MANIFEST_PATH]: JSON.stringify(f.old) });
+    const vault = new WritableVault(Object.fromEntries(Array.from({ length: 33 }, (_, i) => [`local-${i}.md`, 'local'])));
+    const state = new LocalStateStore({ read: () => vault.readInternal('state'), write: text => vault.writeInternal('state', text) }); await state.load();
+    const service = new SyncService(vault, f.remote.transport, '.obsidian', state);
+    const preview = await service.preview(options, 'fixture');
+    expect(preview).toMatchObject({ mode: 'BLOCKED', canExecute: false, deletions: 0, requiresDeleteConfirmation: false,
+      plan: { status: 'REMOTE_MANIFEST_INVALID', executionAllowed: false, entries: [] } });
+    await expect(service.execute(preview, 'fixture', () => {}, undefined, 'DELETE 37')).rejects.toMatchObject({ code: 'BLOCKED' });
+    expect(f.remote.calls.every(c => c.method === 'GET')).toBe(true); expect(vault.mutations).toEqual([]);
+  });
   it('keeps every user/protected blob and Stable ID, increments only the changed revision and generation, then enters normal Attach Preview', async () => {
     const f = fixture(); const before = { ...f.remote.contents() };
     const result = await f.repair.repair(f.head);

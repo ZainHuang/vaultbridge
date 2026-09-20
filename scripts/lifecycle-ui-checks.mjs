@@ -47,6 +47,13 @@ export async function verifyLifecycle({ page, remote, report, runDir, preview, c
   report.checks.push('One Sync confirmation automatically verifies remote/local, advances BASE, completes journal and clears pointer; running and completed Dashboard never offer Resume');
   await dashboardPage.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { document.body.classList.add('emulate-mobile'); app.workspace.leftSplit.collapse(); app.workspace.rightSplit.collapse(); });
+  report.lifecycleMobileLayoutBefore = await dashboardPage.locator('.lms-dashboard:visible').evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
+  // Sidebar collapse animates after setViewportSize; validate the settled layout.
+  await dashboardPage.waitForFunction(() => {
+    const el = [...document.querySelectorAll('.lms-dashboard')].find(el => el.getBoundingClientRect().width > 0);
+    return el && el.scrollWidth <= el.clientWidth + 1;
+  }, null, { timeout: 5000 });
+  report.lifecycleMobileLayoutAfter = await dashboardPage.locator('.lms-dashboard:visible').evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth }));
   assert(await dashboardPage.locator('.lms-dashboard:visible').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
   await dashboardPage.screenshot({ path: join(runDir, 'lifecycle-mobile.png') }); report.screenshots.push('lifecycle-mobile.png');
 }

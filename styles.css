@@ -1,5 +1,15 @@
 .modal.lms-modal { width: min(860px, 95vw); max-height: 90vh; }
 .lms-modal .modal-content { overflow-x: hidden; }
+/* Fit only our mobile dialogs to the visible area above the software keyboard. */
+.modal-container.lms-viewport-container {
+  top: var(--lms-viewport-top, 0px);
+  bottom: auto;
+  height: var(--lms-viewport-height, 100dvh);
+  padding: max(8px, var(--safe-area-inset-top, 0px)) 0 max(8px, var(--safe-area-inset-bottom, 0px));
+}
+.lms-viewport-container .modal.lms-modal { min-height: 0; max-height: 100%; margin-block: 0; }
+.lms-viewport-container .modal-content { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scroll-padding-block: 8px; }
+.lms-viewport-container input { font-size: max(16px, var(--font-ui-small)); min-height: 40px; }
 .lms-modal .modal-content p { margin-top: 8px; margin-bottom: 8px; }
 .lms-subtitle { color: var(--text-muted); margin-top: 0; }
 .lms-meta { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 4px 12px; margin: 12px 0; }

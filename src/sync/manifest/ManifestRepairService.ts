@@ -16,24 +16,32 @@ interface RepairJournal {
 const fail = (code: string, message: string) => new PreviewError('MANIFEST_REPAIR', code, message);
 const fileMap = (snapshot: RemoteSnapshot) => JSON.stringify(snapshot.entries.filter(e => e.type !== 'tree' && e.path !== MANIFEST_PATH)
   .map(e => [e.path, e.type, e.mode, e.sha, e.size]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+export interface ReviewedManifestAddition { path: string; blobSha: string; fileId: string }
 
 /** Explicit maintenance operation, never called by Preview/Auto Sync.
  * Only same-path blob drift is safe without a user identity decision. Retain
  * IDs/tombstones, derive content exclusively from the pinned Git Tree, and never
- * touch local notes or BASE. Missing/added/renamed paths remain blocked. */
+ * touch local notes or BASE. Added paths require an exact explicit review with
+ * new identities; missing/renamed paths remain blocked. */
 export class ManifestRepairService {
   private busy = false;
   constructor(private readonly github: GitHubWriter, private readonly ignore: IgnoreService,
     private readonly journal: { read(): Promise<string | null>; write(text: string): Promise<void> }) {}
-  private corrected(audit: ManifestAudit): SyncManifest {
-    if (!audit.historyValid || !audit.diagnostics.length || audit.diagnostics.some(d => d.kind !== 'BLOB_SHA_MISMATCH')) {
-      throw fail('MANIFEST_REPAIR_UNSAFE', 'Repair requires proven lineage and same-path blob drift only. Identity, scope and structural problems require explicit review.');
+  private corrected(audit: ManifestAudit, additions: readonly ReviewedManifestAddition[]): SyncManifest {
+    const untracked = audit.diagnostics.filter(d => d.kind === 'UNTRACKED_ELIGIBLE_PATH');
+    const paths = new Set(additions.map(a => a.path)); const ids = new Set(additions.map(a => a.fileId));
+    if (!audit.historyValid || !audit.diagnostics.length || audit.diagnostics.some(d => d.kind !== 'BLOB_SHA_MISMATCH' && d.kind !== 'UNTRACKED_ELIGIBLE_PATH')
+      || additions.length !== untracked.length || paths.size !== additions.length || ids.size !== additions.length
+      || additions.some(a => !untracked.some(d => d.path === a.path && d.actualSha === a.blobSha)
+        || !!audit.manifest.files[a.fileId] || Object.values(audit.manifest.files).some(f => f.path === a.path))) {
+      throw fail('MANIFEST_REPAIR_UNSAFE', 'Repair requires proven lineage, same-path blob drift or exactly reviewed additions with new identities. Missing paths, reused identities and scope problems remain blocked.');
     }
     const next = structuredClone(audit.manifest); next.generation++;
-    for (const issue of audit.diagnostics) {
+    for (const issue of audit.diagnostics.filter(d => d.kind === 'BLOB_SHA_MISMATCH')) {
       const entry = next.files[issue.fileId!]!;
       entry.blobSha = issue.actualSha!; entry.revision++;
     }
+    for (const addition of additions) next.files[addition.fileId] = { ...addition, deleted: false, revision: 1 };
     parseManifest(next); validateManifestHistory(audit.manifest, next);
     validateManifestTree(next, audit.snapshot.entries.filter(e => e.type !== 'tree' && !this.ignore.reason(e.path)), p => !this.ignore.reason(p));
     return next;
@@ -53,7 +61,7 @@ export class ManifestRepairService {
     validateManifestTree(t.manifest, snapshot.entries.filter(e => e.type !== 'tree' && !this.ignore.reason(e.path)), p => !this.ignore.reason(p));
     await this.github.verifyBackup(t.backupRef, t.originalHead);
   }
-  async repair(reviewedHead: string): Promise<{ head: string; backupRef: string; generation: number }> {
+  async repair(reviewedHead: string, additions: readonly ReviewedManifestAddition[] = []): Promise<{ head: string; backupRef: string; generation: number }> {
     if (this.busy) throw fail('BUSY', 'A Manifest repair is already running.'); this.busy = true;
     try {
       const saved = await this.journal.read();
@@ -70,7 +78,7 @@ export class ManifestRepairService {
       const head = await this.github.head();
       if (head !== reviewedHead && head !== t?.candidate) throw fail('REMOTE_HEAD_CHANGED', 'Remote HEAD differs from the reviewed repair state. No new repair will be published.');
       const audit = await auditRemoteManifest(this.github.reader, reviewedHead, this.ignore);
-      const manifest = this.corrected(audit);
+      const manifest = this.corrected(audit, additions);
       if (t && (JSON.stringify(t.manifest) !== JSON.stringify(manifest) || t.originalTree !== audit.snapshot.treeSha)) {
         throw fail('REPAIR_JOURNAL_INVALID', 'Journal differs from the independently reconstructed repair.');
       }

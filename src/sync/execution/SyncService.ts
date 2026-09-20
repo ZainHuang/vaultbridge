@@ -112,10 +112,11 @@ export class SyncService {
   }
   private result(session: Session): SyncPreview {
     const e = session.execution;
-    const deletions = Object.keys(e.before).filter(p => !e.after[p]).length + session.capture.remote.entries.filter(f => f.type === 'blob' && !session.capture.ignore.reason(f.path)
-      && !Object.values(e.manifest.files).some(m => !m.deleted && m.path === f.path)).length;
+    const canExecute = e.mode !== 'BLOCKED' && !e.plan.hasConflicts && (e.mode !== 'ADOPT' || !!e.adoptionChoice);
+    const deletions = canExecute ? Object.keys(e.before).filter(p => !e.after[p]).length + session.capture.remote.entries.filter(f => f.type === 'blob' && !session.capture.ignore.reason(f.path)
+      && !Object.values(e.manifest.files).some(m => !m.deleted && m.path === f.path)).length : 0;
     const result: SyncPreview = { state: JSON.parse(session.stateKey), plan: structuredClone(e.plan), mode: e.mode, adoptionChoice: e.adoptionChoice,
-      canExecute: e.mode !== 'BLOCKED' && !e.plan.hasConflicts && (e.mode !== 'ADOPT' || !!e.adoptionChoice), deletions,
+      canExecute, deletions,
       requiresDeleteConfirmation: e.mode !== 'ADOPT' && deletions > session.options.deleteSafetyThreshold, scopeKey: e.scopeKey };
     this.sessions.set(result, session); return result;
   }

@@ -1,4 +1,20 @@
-# VaultBridge 1.1.9 validation
+# VaultBridge validation
+
+## 1.1.10
+
+Validated on 2026-09-20. Changes cover mobile keyboard visibility, repository-level blocked Preview UI, and explicit reviewed additive Manifest maintenance. Existing stable identities, tombstones and three-way resolution rules are unchanged.
+
+- TypeScript, ESLint, production build and public-file/credential audit passed.
+- All 694 unit/regression tests passed, including a regression that reproduces the invalid-plan `DELETE 37` prompt and verifies its removal.
+- All 14 isolated Obsidian integration suites passed their fixture assertions (83 checks), with zero captured console errors in the final runs.
+- The original Preview suite's optional anonymous public GitHub probe returned HTTP 403 and retains `passed_with_live_read_pending`; this is separate from its passing isolated assertions.
+- Keyboard tests cover visual viewport shrink/pan, native keyboard height, both signals together, safe areas, dismissal, modal reopen, exact confirmation matching and desktop behavior. Physical iPhone keyboard testing remains pending.
+- Blocked Preview tests cover invalid/missing Manifest and invalid local state, stale caller flags and malformed Manifest JSON. No executable plan, synthetic operation counts or deletion confirmation are shown for repository-level errors.
+- Maintenance tests cover explicitly reviewed additions, preserving identical-content files as separate identities, existing-BASE sync and empty-device Bootstrap, wrong SHA, missing/extra review, identity reuse, missing tracked paths, backups, stale HEAD, candidate verification and idempotent retries.
+- RED evidence was recorded before each fix. Review/repair guidance was then shared between parsed blocked plans and Manifest read failures.
+- The lifecycle UI harness now waits for the sidebar collapse layout before enforcing the unchanged overflow assertion; Dashboard product behavior was not changed.
+
+## 1.1.9
 
 Validated on 2026-09-20 with Node.js 24.16.0, npm 11.13.0 and Windows Obsidian 1.13.7. This release changes branding and publication packaging; the runtime diff from the previous stable source is eight string replacements across six files. No ID migration, storage-path change, dependency upgrade or synchronization-rule change was made.
 

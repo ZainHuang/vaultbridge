@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseManifest } from '../src/sync/manifest/ManifestValidator';
 import { validateManifestHistory, validateManifestTree } from '../src/sync/manifest/ManifestConsistency';
 import { ThreeWaySyncPlanner } from '../src/sync/planner/ThreeWaySyncPlanner';
-import { previewGroups, canExecutePreview } from '../src/ui/PreviewModel';
+import { previewGroups, canExecutePreview, repositoryBlocked } from '../src/ui/PreviewModel';
 import { manifestOf, version, ignore } from './stateful-helpers';
 import { localSnapshot, remoteSnapshot } from './helpers';
 
@@ -11,6 +11,12 @@ function issues(run: () => unknown) {
   catch (error) { return (error as { diagnostics: unknown[] }).diagnostics; }
 }
 describe('Manifest diagnostics retain exact evidence without file decisions', () => {
+  it.each(['REMOTE_MANIFEST_INVALID', 'REMOTE_MANIFEST_MISSING', 'LOCAL_STATE_INVALID'] as const)('blocks %s even with stale caller flags', status => {
+    const plan = new ThreeWaySyncPlanner().create({ base: null, local: localSnapshot({}), remote: remoteSnapshot({}), remoteManifest: manifestOf() }, ignore);
+    plan.status = status;
+    expect(repositoryBlocked(plan)).toBe(true);
+    expect(canExecutePreview({ canExecute: true, mode: 'SYNC', plan })).toBe(false);
+  });
   it('reports missing, untracked and changed paths together with expected/actual SHA', () => {
     const manifest = manifestOf(version('a', 'missing.md'), version('b', 'changed.md', false, 'id-2'));
     const tree = remoteSnapshot({ 'changed.md': 'changed', 'extra.md': 'new' });

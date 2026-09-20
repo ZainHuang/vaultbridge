@@ -81,8 +81,8 @@ try {
   const commands = await page.evaluate(() => Object.keys(app.commands.commands).filter(x => x.startsWith('local-mirror-sync:')));
   assert.equal(commands.length, 7); report.checks.push('Production plugin retains five V1 commands and adds Dashboard and Sync History');
   const ready = async () => {
-    await surface('.lms-summary, .lms-error[role="alert"]');
-    assert.equal(await ui.locator('.lms-summary').count(), 1, await ui.locator('.lms-modal').innerText());
+    await surface('.lms-summary, .lms-blocking-banner, .lms-error[role="alert"]');
+    assert.equal(await ui.locator('.lms-summary, .lms-blocking-banner').count(), 1, await ui.locator('.lms-modal').innerText());
   };
   const preview = async () => { await page.evaluate(() => {
     const plugin = app.plugins.plugins['local-mirror-sync']; plugin.openPreview();
@@ -101,7 +101,10 @@ try {
   const localText = path => page.evaluate(path => app.vault.adapter.read(path), path);
   const state = () => page.evaluate(() => app.plugins.plugins['local-mirror-sync'].syncState.current());
 
-  if (process.argv.includes('--brand')) {
+  if (process.argv.includes('--keyboard')) {
+    const { verifyMobileKeyboard } = await import('./mobile-keyboard-ui-checks.mjs');
+    await verifyMobileKeyboard({ page, remote, report, preview, close, state, getUI: () => ui, screenshot });
+  } else if (process.argv.includes('--brand')) {
     const { verifyBrand } = await import('./brand-ui-checks.mjs');
     await verifyBrand({ page, remote, preview, execute: sync, close, state, report, screenshot, surface });
   } else if (process.argv.includes('--dashboard')) {

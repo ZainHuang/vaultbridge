@@ -2,6 +2,7 @@ import { Modal, type App } from 'obsidian';
 import { safeError } from '../errors';
 import { PRIMARY_CONFIRMATION, primaryDeclarationBlock } from '../state/StateStore';
 import type { PreviewResult } from '../sync/PreviewResult';
+import { keepModalAboveKeyboard } from './MobileModalViewport';
 
 export const BOOTSTRAP_PLACEHOLDER = 'Remote bootstrap is preview only. No files are downloaded and no synchronized base is established until a future Restore completes and passes verification.';
 
@@ -21,11 +22,13 @@ export type DeclarePrimary = (preview: PreviewResult, phrase: string, signal: Ab
 export class DeclarePrimaryModal extends Modal {
   private readonly controller = new AbortController();
   private busy = false;
+  private releaseViewport?: () => void;
   constructor(app: App, private readonly preview: PreviewResult, private readonly declare: DeclarePrimary, private readonly completed: () => void) { super(app); }
 
   onOpen(): void {
     this.modalEl.addClass('lms-modal', 'lms-declare-modal');
     this.setTitle('Declare this device as Local Primary');
+    this.releaseViewport = keepModalAboveKeyboard(this);
     const el = this.contentEl;
     el.createEl('p', { text: `Local files: ${this.preview.plan.localCount}`, cls: 'lms-declare-count' });
     el.createEl('p', { text: `Remote files: ${this.preview.plan.remoteCount}`, cls: 'lms-declare-count' });
@@ -57,5 +60,5 @@ export class DeclarePrimaryModal extends Modal {
     };
   }
 
-  onClose(): void { this.controller.abort(); this.contentEl.empty(); }
+  onClose(): void { this.releaseViewport?.(); this.controller.abort(); this.contentEl.empty(); }
 }

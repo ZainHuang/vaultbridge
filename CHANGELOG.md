@@ -1,5 +1,13 @@
 # VaultBridge changelog
 
+## 1.1.10 — Blocked-plan diagnostics and mobile confirmation
+
+- Repository-level blocked previews show diagnostics and review/repair guidance, with Sync disabled and no synthetic operation counts or deletion confirmation.
+- Deletion impact and confirmation are available only for executable plans above the configured threshold.
+- Explicit maintenance supports exactly reviewed additive Manifest registrations with new identities, verified backup refs, unchanged user Trees and candidate verification before publication. Preview never repairs a Manifest automatically.
+- Mobile confirmation dialogs adapt to the keyboard-visible viewport and native keyboard height, scroll the focused field/actions into view, and respect safe areas.
+- Three-way resolution, existing stable identities and tombstones retain their existing semantics.
+
 ## 1.1.9 — First public VaultBridge release
 
 - Renamed the display name, settings, Preview, Dashboard, command prefix, activity labels, commit messages and distribution metadata to VaultBridge.

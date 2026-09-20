@@ -69,7 +69,7 @@ flowchart LR
 
 ### Windows / Android：安装 Release
 
-1. 从 [最新 Release](https://github.com/ZainHuang/vaultbridge/releases/latest) 下载 `vaultbridge-1.1.9.zip`，不要下载 GitHub 自动生成的 Source code 压缩包。
+1. 从 [最新 Release](https://github.com/ZainHuang/vaultbridge/releases/latest) 下载 `vaultbridge-1.1.10.zip`，不要下载 GitHub 自动生成的 Source code 压缩包。
 2. 解压后得到 `local-mirror-sync` 文件夹，里面是 `main.js`、`manifest.json`、`styles.css`。
 3. 放入 Vault 的 `.obsidian/plugins/`。Android 文件管理器可能需要开启“显示隐藏文件”。自定义 Obsidian 配置目录时，用它替代 `.obsidian`。
 4. 重启 Obsidian，在 **Settings → Community plugins** 中允许社区插件并启用 **VaultBridge**。
