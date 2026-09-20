@@ -54,6 +54,10 @@ flowchart LR
 
 日常流程：**Preview → 审阅操作与冲突 → Sync & Verify → 保存并读回 BASE**。需要发布时，文件与 Manifest 放在同一个 GitHub commit 中，分支更新使用 `force:false`。
 
+手机端点击文件可打开独立大弹窗，查看两端内容并选择 **Use LOCAL / Use REMOTE**。也可以使用 **Use LOCAL / REMOTE for all conflicts** 一次选择当前预览中的全部冲突（含被筛选隐藏的冲突）；非冲突项继续按原计划同步。LOCAL 指当前设备，REMOTE 指 GitHub。这些按钮只更新预览，仍需点击 **Sync & Verify** 才执行。
+
+身份不确定的文件也支持明确选边：保留无身份的本地文件会分配新 ID，不推断重命名；选择某端也包含该端的文件缺失状态，因此可能产生删除。预览会列出操作并保留删除确认、事务备份和 Verify。若所选结果仍存在重复路径或无法写入的路径，会显示具体诊断；Manifest 等仓库级错误仍须先修复。
+
 ## Safety model · 安全边界
 
 - 冲突不静默覆盖；需要逐文件选择，无法确认身份或路径时保持阻断。
@@ -69,7 +73,7 @@ flowchart LR
 
 ### Windows / Android：安装 Release
 
-1. 从 [最新 Release](https://github.com/ZainHuang/vaultbridge/releases/latest) 下载 `vaultbridge-1.1.10.zip`，不要下载 GitHub 自动生成的 Source code 压缩包。
+1. 从 [最新 Release](https://github.com/ZainHuang/vaultbridge/releases/latest) 下载 `vaultbridge-1.1.11.zip`，不要下载 GitHub 自动生成的 Source code 压缩包。
 2. 解压后得到 `local-mirror-sync` 文件夹，里面是 `main.js`、`manifest.json`、`styles.css`。
 3. 放入 Vault 的 `.obsidian/plugins/`。Android 文件管理器可能需要开启“显示隐藏文件”。自定义 Obsidian 配置目录时，用它替代 `.obsidian`。
 4. 重启 Obsidian，在 **Settings → Community plugins** 中允许社区插件并启用 **VaultBridge**。

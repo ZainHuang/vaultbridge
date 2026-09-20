@@ -58,6 +58,21 @@
 .lms-modal button:focus-visible, .lms-modal summary:focus-visible, .lms-modal input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .lms-footer { flex-wrap: wrap; }
 .lms-compare { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; font-size: var(--font-small); }
+.lms-open-detail { display: none; }
+.modal.lms-file-modal { height: min(780px, 90vh); }
+.lms-file-modal .modal-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; flex: 1; }
+.lms-file-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-inline: 2px; }
+.lms-file-path { overflow-wrap: anywhere; font-weight: var(--font-semibold); }
+.lms-file-body .lms-compare { max-height: none; overflow: visible; }
+.lms-file-actions { flex-shrink: 0; margin: 0; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
+.lms-file-actions button { min-height: 44px; }
+.lms-viewport-container .modal.lms-preview-modal,
+.lms-viewport-container .modal.lms-file-modal { height: 100%; width: calc(100% - 16px); padding: 16px; }
+.lms-viewport-container .lms-preview-modal .lms-table-wrap { max-height: none; overflow: visible; flex-shrink: 0; }
+.lms-viewport-container .lms-open-detail { display: block; color: var(--text-accent); font-size: var(--font-small); margin-top: 4px; }
+.lms-viewport-container .lms-file-modal .modal-content { overflow: hidden; }
+.lms-viewport-container .lms-file-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lms-viewport-container .lms-file-actions button { width: 100%; justify-content: center; text-align: center; }
 .lms-recovery-status { white-space: pre-line; }
 .lms-dashboard { overflow: auto; overflow-x: hidden; padding: 24px; font-size: var(--font-ui-small); }
 .lms-dashboard h1 { font-size: var(--font-ui-large); line-height: 1.35; margin: 0 0 16px; overflow-wrap: anywhere; }

@@ -58,6 +58,11 @@ export async function verifyDashboard({ page, remote, report, runDir, preview, s
   report.checks.push('Real Sync completion refreshes health/history; unchanged History notifications preserve row nodes');
   await getUI().setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { document.body.classList.add('emulate-mobile'); app.workspace.leftSplit.collapse(); app.workspace.rightSplit.collapse(); });
+  // Obsidian animates sidebar collapse; check overflow once the mobile layout settles.
+  await getUI().waitForFunction(() => {
+    const el = [...document.querySelectorAll('.lms-dashboard')].find(el => el.getBoundingClientRect().width > 0);
+    return el && el.scrollWidth <= el.clientWidth + 1;
+  });
   assert(await getUI().locator('.lms-dashboard:visible').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
   await getUI().screenshot({ path: join(runDir, 'dashboard-history-mobile.png') }); report.screenshots.push('dashboard-history-mobile.png');
 }

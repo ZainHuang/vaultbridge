@@ -2,6 +2,7 @@ import { Modal, type App } from 'obsidian';
 import { PreviewError, safeError } from '../errors';
 import { recoveryActions, type RecoveryAction } from './RecoveryUI';
 import { keepModalAboveKeyboard } from './MobileModalViewport';
+import { FileDetailsModal } from './FileDetailsModal';
 import type { RepositoryTarget } from '../github/types';
 import type { SyncDecision, ThreeWayPlan } from '../sync/planner/SyncDecision';
 import { PREVIEW_GROUPS, decisionGroup, previewGroups, canExecutePreview, repositoryBlocked, type PreviewGroup } from './PreviewModel';
@@ -14,6 +15,7 @@ type RunPreview = (progress: Progress, signal: AbortSignal) => Promise<StatefulP
 export interface SyncActions {
   execute(result: SyncPreview, progress: Progress, signal: AbortSignal, confirmation: string): Promise<void>;
   resolve(result: SyncPreview, key: string, choice: Resolution): SyncPreview;
+  resolveAll(result: SyncPreview, choice: Resolution): SyncPreview;
   selectAdoption(result: SyncPreview, choice: Resolution): SyncPreview;
   inspect(result: SyncPreview, entry: SyncDecision): Promise<string>;
   recover(action?: RecoveryAction): void;
@@ -31,18 +33,21 @@ export class PreviewModal extends Modal {
   private result?: SyncPreview;
   private executing = false;
   private releaseViewport?: () => void;
+  private fileModal?: FileDetailsModal;
+  private choiceNotice?: string;
 
   constructor(app: App, private readonly target: RepositoryTarget & { deleteSafetyThreshold?: number }, private readonly run: RunPreview, private readonly actions?: SyncActions,
     private readonly recover?: (action?: RecoveryAction) => void) { super(app); }
 
   onOpen(): void {
-    this.modalEl.addClass('lms-modal');
+    this.modalEl.addClass('lms-modal', 'lms-preview-modal');
     this.setTitle('VaultBridge');
     this.releaseViewport = keepModalAboveKeyboard(this);
     void this.load();
   }
 
   onClose(): void {
+    this.fileModal?.close();
     this.releaseViewport?.();
     if (!this.executing) this.controller?.abort();
     this.contentEl.empty();
@@ -60,6 +65,8 @@ export class PreviewModal extends Modal {
   }
 
   private async load(): Promise<void> {
+    this.fileModal?.close();
+    this.choiceNotice = undefined;
     this.controller?.abort();
     const controller = new AbortController();
     this.controller = controller;
@@ -97,6 +104,7 @@ export class PreviewModal extends Modal {
   }
 
   private renderPlan(result: StatefulPreviewResult): void {
+    this.fileModal?.close();
     const { plan } = result;
     this.plan = plan;
     this.result = 'mode' in result ? result as SyncPreview : undefined;
@@ -165,7 +173,17 @@ export class PreviewModal extends Modal {
     el.createEl('p', { text: `Push ${groups.Push} · Pull ${groups.Pull} · Conflict ${groups.Conflict}`, cls: 'lms-operations' });
     const deletions = plan.counts.PUSH_DELETE + plan.counts.PULL_DELETE;
     if (deletions > (this.target.deleteSafetyThreshold ?? 20) && this.result?.mode !== 'ADOPT') el.createEl('p', { text: `Deletion review: ${plan.counts.PUSH_DELETE} remote and ${plan.counts.PULL_DELETE} local deletions suggested. Nothing will be deleted in Preview.`, cls: 'lms-warning' });
-    if (plan.hasConflicts) el.createEl('p', { text: 'Conflicts require review. Both versions are preserved; no automatic winner is selected.', cls: 'lms-error' });
+    if (plan.hasConflicts) el.createEl('p', { text: 'Choose Local or Remote for each conflict, or apply one choice to all conflicts. Choices update this preview; files change only after Sync & Verify.', cls: 'lms-error' });
+    if (this.choiceNotice) el.createEl('p', { text: this.choiceNotice, cls: 'lms-status', attr: { role: 'status' } });
+    if (groups.Conflict && this.result && this.actions && this.result.mode !== 'ADOPT') {
+      const current = this.result;
+      const choices = el.createDiv({ cls: 'lms-device-actions lms-conflict-choices', attr: { 'aria-label': 'Resolve all conflicts' } });
+      for (const choice of ['local', 'remote'] as const) choices.createEl('button', { text: `Use ${choice.toUpperCase()} for all conflicts` }).onclick = () => {
+        this.choose(() => this.actions!.resolveAll(current, choice), el,
+          `Applied ${choice.toUpperCase()} to ${groups.Conflict} conflicts. Review the updated operations and deletion count before syncing.`);
+      };
+      el.createEl('p', { text: 'Applies to all conflicts in this preview, including files hidden by the filter. Other planned changes are retained.', cls: 'lms-muted' });
+    }
     if (plan.status === 'READY' && !groups.Push && !groups.Pull && !groups.Conflict) el.createEl('p', { text: 'No changes planned. The synchronized identities agree.', cls: 'lms-status' });
     if (this.result?.mode !== 'ADOPT' || !this.actions) el.createEl('p', { text: this.actions ? 'Review this snapshot before Sync. Files and BASE change only after you execute; recovery copies are retained locally.' : 'Preview only. No upload, download, deletion or sync-history advancement. Ignored files and internal metadata are outside the sync domain.', cls: 'lms-muted' });
     const label = el.createEl('label', { cls: 'lms-search-label', text: 'Filter by path' });
@@ -246,27 +264,77 @@ export class PreviewModal extends Modal {
     const summary = details.createEl('summary');
     summary.createSpan({ text: entry.category, cls: `lms-category lms-${entry.category.toLowerCase()}` });
     summary.createSpan({ text: entry.oldPath ? `${entry.oldPath} → ${entry.path}` : entry.path, cls: 'lms-path' });
+    summary.createSpan({ text: 'View details', cls: 'lms-open-detail' });
+    summary.onclick = event => {
+      const doc = summary.ownerDocument;
+      if (doc.body.matches('.is-mobile, .emulate-mobile') || doc.defaultView?.matchMedia('(max-width: 600px)').matches) {
+        event.preventDefault(); this.openFile(entry, true, summary);
+      }
+    };
     const body = details.createDiv({ cls: 'lms-entry-detail' });
+    this.renderEntryDetail(body, entry, this.result);
+  }
+
+  private choose(resolve: () => SyncPreview, errorHost: HTMLElement, notice: string): void {
+    try {
+      const result = resolve();
+      this.choiceNotice = result.plan.hasConflicts ? `${notice} ${previewGroups(result.plan).Conflict} conflicts still require review.` : notice;
+      // Show resolved operations too, rather than an apparently empty Conflict filter.
+      this.filter = 'ALL'; this.query = ''; this.page = 0;
+      this.renderPlan(result);
+    } catch (error) {
+      errorHost.querySelector('.lms-choice-error')?.remove();
+      errorHost.createEl('p', { text: safeError(error), cls: 'lms-error lms-choice-error', attr: { role: 'alert' } });
+    }
+  }
+
+  private openFile(entry: SyncDecision, inspect = false, returnFocus?: HTMLElement): void {
+    this.fileModal?.close();
+    const current = this.result;
+    const modal = new FileDetailsModal(this.app, (body, actions) => {
+      body.createEl('p', { text: entry.path, cls: 'lms-file-path' });
+      if (entry.oldPath) body.createEl('p', { text: `Previous path: ${entry.oldPath}`, cls: 'lms-wrap' });
+      body.createEl('p', { text: entry.category, cls: 'lms-head' });
+      this.renderEntryDetail(body, entry, current, actions, inspect);
+    }, () => {
+      if (this.fileModal === modal) this.fileModal = undefined;
+      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+    });
+    this.fileModal = modal; modal.open();
+  }
+
+  private renderEntryDetail(body: HTMLElement, entry: SyncDecision, current?: SyncPreview, footer?: HTMLElement, inspect = false): void {
     if (entry.reason) body.createEl('p', { text: entry.reason });
-    if (entry.fileId) body.createEl('p', { text: `File ID: ${entry.fileId}`, cls: 'lms-head' });
-    if (entry.baseSha) body.createEl('p', { text: `Base blob: ${entry.baseSha}`, cls: 'lms-head' });
-    if (entry.localSha) body.createEl('p', { text: `Local blob: ${entry.localSha}`, cls: 'lms-head' });
-    if (entry.remoteSha) body.createEl('p', { text: `Remote blob: ${entry.remoteSha}`, cls: 'lms-head' });
-    if (entry.category.startsWith('CONFLICT_') && this.actions && this.result) {
-      const current = this.result;
-      const controls = body.createDiv({ cls: 'lms-device-actions' });
-      controls.createEl('button', { text: 'Inspect both versions' }).onclick = async () => {
-        const modal = new Modal(this.app); modal.modalEl.addClass('lms-modal'); modal.setTitle(entry.path);
-        const content = modal.contentEl.createEl('pre', { text: 'Loading pinned versions…', cls: 'lms-compare' }); modal.open();
+    const metadata = footer ? body.createEl('details', { cls: 'lms-file-metadata' }) : body;
+    if (footer) metadata.createEl('summary', { text: 'File identity and hashes' });
+    if (entry.fileId) metadata.createEl('p', { text: `File ID: ${entry.fileId}`, cls: 'lms-head' });
+    if (entry.baseSha) metadata.createEl('p', { text: `Base blob: ${entry.baseSha}`, cls: 'lms-head' });
+    if (entry.localSha) metadata.createEl('p', { text: `Local blob: ${entry.localSha}`, cls: 'lms-head' });
+    if (entry.remoteSha) metadata.createEl('p', { text: `Remote blob: ${entry.remoteSha}`, cls: 'lms-head' });
+    if (entry.category.startsWith('CONFLICT_') && this.actions && current) {
+      const controls = footer ?? body.createDiv({ cls: 'lms-device-actions' });
+      const compare = controls.createEl('button', { text: 'Inspect both versions' });
+      const inspectVersions = async () => {
+        if (!footer) { this.openFile(entry, true); return; }
+        compare.disabled = true;
+        body.querySelector('.lms-compare')?.remove();
+        const content = body.createEl('pre', { text: 'Loading pinned versions…', cls: 'lms-compare', attr: { role: 'status' } });
+        content.scrollIntoView({ block: 'nearest' });
         try { content.setText(await this.actions!.inspect(current, entry)); } catch (error) { content.setText(safeError(error)); }
+        finally { compare.disabled = false; }
       };
-      if (entry.category !== 'CONFLICT_IDENTITY_UNCERTAIN' && current.mode !== 'ADOPT') for (const choice of ['local', 'remote'] as const) {
+      compare.onclick = () => { void inspectVersions(); };
+      if (inspect) void inspectVersions();
+      for (const choice of ['local', 'remote'] as const) {
         controls.createEl('button', { text: `Use ${choice.toUpperCase()}` }).onclick = () => {
-          const resolved = this.actions!.resolve(current, entry.fileId ?? entry.path, choice);
-          this.renderPlan(resolved);
+          this.choose(() => current.mode === 'ADOPT' ? this.actions!.selectAdoption(current, choice)
+            : this.actions!.resolve(current, entry.fileId ?? entry.path, choice), body,
+          `Selected ${choice.toUpperCase()}. Review the updated preview before syncing.`);
         };
       }
-      else if (entry.category === 'CONFLICT_IDENTITY_UNCERTAIN') body.createEl('p', { text: 'Identity or path ownership is ambiguous. Restore the tracked path or rename it inside Obsidian, then refresh. No side can be chosen automatically.', cls: 'lms-warning' });
+      if (footer) controls.appendChild(compare);
+      if (current.mode === 'ADOPT') body.createEl('p', { text: 'Legacy adoption: these choices apply to the whole eligible Vault, as shown in the adoption preview.', cls: 'lms-warning' });
+      else if (entry.category === 'CONFLICT_IDENTITY_UNCERTAIN') body.createEl('p', { text: 'Choose which side to keep, including its missing files. Untracked files kept from Local receive new identities; no rename is guessed. Related path conflicts may need the same choice.', cls: 'lms-warning' });
     }
   }
 }

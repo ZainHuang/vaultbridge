@@ -71,16 +71,25 @@ export function compileExecution(capture: Capture, state: LocalSyncState, remote
   }
   const conflicts = pathConflictChecker([...new Set([...Object.keys(before), ...domain.remote.map(f => f.path)])], remote.entries, ignore);
   for (const entry of entries) {
+    // Identity diagnostics still need the captured bytes for manual inspection.
+    entry.localSha ??= entry.fileId ? localById.get(entry.fileId)?.blobSha : localByPath.get(entry.path)?.sha;
+    entry.remoteSha ??= entry.fileId ? manifest.files[entry.fileId]?.blobSha : domain.remote.find(file => file.path === entry.path)?.sha;
     const problem = conflicts(entry.path, domain.remote.find(f => f.path === entry.path)) ?? (entry.oldPath ? conflicts(entry.oldPath) : undefined);
     if (problem) { entry.category = 'CONFLICT_IDENTITY_UNCERTAIN'; entry.reason = problem; }
     const choice = resolutions[entry.fileId ?? entry.path];
-    if (!adoptionChoice && entry.category.startsWith('CONFLICT_') && entry.category !== 'CONFLICT_IDENTITY_UNCERTAIN' && choice) {
+    if (!adoptionChoice && entry.category.startsWith('CONFLICT_') && choice && !problem) {
       entry.reason = `Explicit resolution: use ${choice.toUpperCase()} (other bytes retained in transaction backup).`;
-      const l = entry.fileId ? localById.get(entry.fileId) : undefined;
-      const r = entry.fileId ? manifest.files[entry.fileId] : undefined;
-      entry.category = choice === 'local' ? l ? r?.deleted ? 'PUSH_ADD' : 'PUSH_UPDATE' : 'PUSH_DELETE'
-        : r?.deleted ? 'PULL_DELETE' : 'PULL_UPDATE';
-      if (choice === 'local' && l) entry.path = l.path;
+      // An explicit choice accepts presence/absence as captured. Never guess a rename
+      // for an untracked path: keeping it creates a fresh ID, keeping absence a tombstone.
+      const unmatched = !entry.fileId ? localByPath.get(entry.path) : undefined;
+      const l = entry.fileId ? localById.get(entry.fileId)
+        : unmatched ? { path: unmatched.path, blobSha: unmatched.sha } : undefined;
+      const r = entry.fileId ? manifest.files[entry.fileId]
+        : Object.values(manifest.files).find(file => !file.deleted && file.path === entry.path);
+      entry.category = choice === 'local' ? l ? !r || r.deleted ? 'PUSH_ADD' : 'PUSH_UPDATE' : !r || r.deleted ? 'UNCHANGED' : 'PUSH_DELETE'
+        : !r || r.deleted ? 'PULL_DELETE' : l ? 'PULL_UPDATE' : 'PULL_ADD';
+      entry.localSha = l?.blobSha; entry.remoteSha = r?.blobSha;
+      if (choice === 'local') entry.path = l?.path ?? r?.path ?? entry.path;
       if (choice === 'remote' && r) entry.path = r.path;
       if (l && r && !r.deleted && l.path !== r.path) {
         entry.oldPath = choice === 'local' ? r.path : l.path;
@@ -106,9 +115,13 @@ export function compileExecution(capture: Capture, state: LocalSyncState, remote
   }
   if (changed) manifest.generation++;
   const after = Object.fromEntries(Object.values(manifest.files).filter(f => !f.deleted && domain.eligible(f.path)).map(f => [f.path, f.blobSha!]));
+  const owners = new Map<string, number>();
+  for (const file of Object.values(manifest.files).filter(f => !f.deleted)) owners.set(file.path, (owners.get(file.path) ?? 0) + 1);
   const destinationConflict = pathConflictChecker([...new Set([...Object.keys(after), ...local.ignored.map(f => f.path), ...excludedPaths])], remote.entries, ignore);
   for (const entry of entries) {
-    const reason = destinationConflict(entry.path);
+    const reason = (owners.get(entry.path) ?? 0) > 1
+      ? 'Selected versions assign the same destination to multiple files. Choose the same side for the related conflicts, or rename a file and refresh.'
+      : destinationConflict(entry.path);
     if (reason) { entry.category = 'CONFLICT_IDENTITY_UNCERTAIN'; entry.reason = reason; }
   }
   // Validate only executable plans: conflicting choices can temporarily share destinations.

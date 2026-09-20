@@ -138,9 +138,12 @@ try {
   await page.getByRole('button', { name: 'Push 90', exact: true }).click();
   await page.getByRole('searchbox').fill('long-name');
   await page.locator('.lms-entry summary').click();
+  assert.equal(await page.locator('.lms-file-modal').count(), 1);
+  await page.locator('.lms-file-metadata summary').click();
   const overflow = await page.evaluate(() => [...document.querySelectorAll('.lms-modal, .lms-modal .modal-content, .lms-table-wrap')].map(el => ({ width: el.clientWidth, scroll: el.scrollWidth })));
   assert(overflow.every(item => item.scroll <= item.width + 1), JSON.stringify(overflow));
   await screenshot('stateful-mobile-details.png');
+  await page.locator('.lms-file-modal').getByRole('button', { name: 'Back to preview', exact: true }).click();
   await page.locator('.lms-modal .modal-content').evaluate(el => { el.scrollTop = 0; });
   await screenshot('stateful-mobile-top.png');
   report.checks.push('390px viewport fits long Unicode paths, hashes and full directional category labels');

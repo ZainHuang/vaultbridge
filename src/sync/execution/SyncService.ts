@@ -83,8 +83,19 @@ export class SyncService {
   }
   resolve(preview: SyncPreview, key: string, resolution: Resolution): SyncPreview {
     const old = this.session(preview);
+    return this.resolveChoices(old, { [key]: resolution });
+  }
+  resolveAll(preview: SyncPreview, resolution: Resolution): SyncPreview {
+    const old = this.session(preview);
+    const choices = Object.fromEntries(old.execution.plan.entries.filter(entry => entry.category.startsWith('CONFLICT_'))
+      .map(entry => [entry.fileId ?? entry.path, resolution]));
+    return this.resolveChoices(old, choices);
+  }
+  private resolveChoices(old: Session, choices: Record<string, Resolution>): SyncPreview {
     if (old.execution.mode === 'ADOPT') throw fail('ADOPTION_CHOICE_REQUIRED', 'Choose Use Local or Use Remote for legacy adoption.');
-    const resolutions = { ...old.resolutions, [key]: resolution };
+    if (old.execution.mode === 'BLOCKED') throw fail('BLOCKED', 'Repair the repository diagnostic before choosing file versions.');
+    if (Object.values(choices).some(choice => choice !== 'local' && choice !== 'remote')) throw fail('INVALID_RESOLUTION', 'Choose Local or Remote.');
+    const resolutions = { ...old.resolutions, ...choices };
     const identities = Object.fromEntries(Object.values(old.execution.manifest.files).filter(f => !f.deleted).map(f => [f.path, f.fileId]));
     const execution = compileExecution(old.capture, parseLocalState(JSON.parse(old.stateKey)), old.manifest, old.execution.scopeKey, resolutions, identities);
     return this.result({ ...old, execution, resolutions });
@@ -99,7 +110,8 @@ export class SyncService {
     const { capture, options, manifest } = this.session(preview);
     await capture.verify();
     const legacy = !manifest ? capture.remote.entries.find(f => f.path === entry.path && f.type === 'blob') : undefined;
-    const remote = (entry.fileId ? manifest?.files[entry.fileId] : undefined) ?? (legacy ? { path: legacy.path, blobSha: legacy.sha, deleted: false } : undefined);
+    const remote = (entry.fileId ? manifest?.files[entry.fileId] : Object.values(manifest?.files ?? {}).find(file => !file.deleted && file.path === entry.path))
+      ?? (legacy ? { path: legacy.path, blobSha: legacy.sha, deleted: false } : undefined);
     const render = (bytes: Uint8Array) => {
       try { const value = new TextDecoder('utf-8', { fatal: true }).decode(bytes); return value.includes('\0') ? '[Binary content; compare SHA above]' : value.slice(0, 32768) + (value.length > 32768 ? '\n[Truncated at 32K characters]' : ''); }
       catch { return '[Binary content; compare SHA above]'; }

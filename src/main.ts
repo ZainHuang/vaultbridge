@@ -213,6 +213,7 @@ export default class LocalMirrorSyncPlugin extends Plugin {
         catch (error) { try { this.syncState.current(); } catch (stateError) { this.stateError = stateError; } await this.recordFailure(error); throw error; }
       },
       resolve: (result, key, choice) => this.sync.resolve(result, key, choice),
+      resolveAll: (result, choice) => this.sync.resolveAll(result, choice),
       selectAdoption: (result, choice) => this.sync.selectAdoption(result, choice),
       inspect: (result, entry) => this.sync.inspect(result, entry, this.tokens.read(settings)),
       recover: action => this.openRecovery(action),

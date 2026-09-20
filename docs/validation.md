@@ -1,5 +1,17 @@
 # VaultBridge validation
 
+## 1.1.11
+
+Changes: mobile file rows open a separate near-full-height dialog with independently scrolling content and visible Local/Remote actions; the main mobile Preview uses the available height. Conflict decisions can be applied individually or to all conflicts in the captured preview, including identity uncertainty. Selection only recompiles the plan; it never executes synchronization. Untracked local paths kept explicitly receive fresh identities, existing tombstones stay immutable, and no rename is inferred. Repository diagnostics and invalid destination paths still block execution.
+
+- RED: the actual Obsidian mobile test reproduced inline details instead of an independent dialog. Seven initial service regressions failed on missing bulk/identity resolution before implementation.
+- Service regressions cover both authorities, unrelated one-sided changes, unrecorded rename+edit, independent choices, stale HEAD, immutable tombstones, path swaps, ownership collisions and conflicting mixed choices.
+- All 709 tests across 34 files, TypeScript, ESLint and the mobile-safe build passed. The final deletion-path regression also recorded RED before correcting the reviewed path.
+- Mobile integration checks cover portrait/landscape, long content, fixed actions, comparison loading/error/retry, per-file and filtered bulk selection, Back/Escape and preserved desktop behavior. The suite uses a disposable Vault and synthetic remote; it does not change the user's notes.
+- All 15 Obsidian suites passed their fixture checks (87 checks total). The original read-only Preview suite's optional anonymous GitHub probe remains HTTP 403 / `passed_with_live_read_pending`, independently of passing fixture checks. The other 14 suites passed with zero captured console errors.
+- Existing mobile Preview tests now exercise the separate detail dialog. The Dashboard test waits for Obsidian's sidebar collapse to settle before the same overflow assertion; Dashboard product code is unchanged.
+- Physical iPhone validation remains a user-device check; mobile dimensions and host mobile styles are exercised in the actual Windows Obsidian application.
+
 ## 1.1.10
 
 Validated on 2026-09-20. Changes cover mobile keyboard visibility, repository-level blocked Preview UI, and explicit reviewed additive Manifest maintenance. Existing stable identities, tombstones and three-way resolution rules are unchanged.

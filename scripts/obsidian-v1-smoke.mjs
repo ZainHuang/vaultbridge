@@ -101,7 +101,10 @@ try {
   const localText = path => page.evaluate(path => app.vault.adapter.read(path), path);
   const state = () => page.evaluate(() => app.plugins.plugins['local-mirror-sync'].syncState.current());
 
-  if (process.argv.includes('--keyboard')) {
+  if (process.argv.includes('--details')) {
+    const { verifyMobileDetails } = await import('./mobile-details-ui-checks.mjs');
+    await verifyMobileDetails({ page, remote, report, preview, sync, close, state, getUI: () => ui, screenshot });
+  } else if (process.argv.includes('--keyboard')) {
     const { verifyMobileKeyboard } = await import('./mobile-keyboard-ui-checks.mjs');
     await verifyMobileKeyboard({ page, remote, report, preview, close, state, getUI: () => ui, screenshot });
   } else if (process.argv.includes('--brand')) {
@@ -159,7 +162,7 @@ try {
   await preview(); assert.equal(await ui.locator('.lms-execute').isDisabled(), true); await ui.locator('.lms-entry').filter({ hasText: 'CONFLICT_CONTENT' }).locator('summary').click();
   await ui.getByRole('button', { name: 'Inspect both versions', exact: true }).click(); await surface('.lms-compare');
   await ui.waitForFunction(() => document.querySelector('.lms-compare')?.textContent.includes('# Remote conflict')); await screenshot('05-mobile-conflict-inspection');
-  await ui.keyboard.press('Escape'); await ready(); await ui.getByRole('button', { name: 'Use REMOTE', exact: true }).click(); await sync();
+  await ui.locator('.lms-file-modal').getByRole('button', { name: 'Use REMOTE', exact: true }).click(); await ready(); await sync();
   assert.equal(await localText('renamed.md'), '# Remote conflict'); report.checks.push('Conflict blocks execution; pinned content inspection and explicit REMOTE resolution work');
   await close(); bVault.files.delete('renamed.md'); await bState.recordDelete('renamed.md'); await bRun();
   await page.evaluate(() => { app.plugins.plugins['local-mirror-sync'].settings.deleteSafetyThreshold = 0; }); await preview();
