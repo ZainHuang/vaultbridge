@@ -37,6 +37,31 @@ function unpack(raw: string | null): unknown {
 export class TransactionStore {
   constructor(private readonly vault: SyncVault) {}
   directory(id: string) { if (!/^[a-f0-9-]{36}$/.test(id)) throw recoveryError(); return `${ROOT}/${id}`; }
+  /** Historical path hints only, never file-deletion or BASE authority. Old
+   * completed journals let upgrades clean folders left by earlier executors. */
+  async completedFolderSources(current: SyncTransaction): Promise<SyncTransaction[]> {
+    const result: SyncTransaction[] = [];
+    const listing = await this.vault.list(ROOT);
+    for (const folder of listing.folders) {
+      const id = folder.slice(`${ROOT}/`.length);
+      if (!/^[a-f0-9-]{36}$/.test(id) || id === current.id || folder !== this.directory(id)) continue;
+      for (const name of ['journal.json', 'journal-copy.json']) {
+        try {
+          const value = unpack(await this.vault.readInternal(`${folder}/${name}`)) as SyncTransaction;
+          if (value.version !== 1 || value.id !== id || value.phase !== 'complete' || value.scopeKey !== current.scopeKey
+            || !sameTransactionTarget(value.options, current.options) || value.originalState.deviceId !== current.originalState.deviceId) continue;
+          parseLocalState(value.originalState); parseManifest(value.manifest);
+          if (!isRecord(value.before) || !isRecord(value.after) || !Array.isArray(value.excludedPaths)) continue;
+          for (const [path, sha] of [...Object.entries(value.before), ...Object.entries(value.after)]) {
+            assertPath(path); if (!isSha(sha) || portablePathIssue(path)) throw recoveryError();
+          }
+          for (const path of value.excludedPaths) assertPath(path);
+          result.push(value); break;
+        } catch { /* Damaged historical hints cannot authorize cleanup. */ }
+      }
+    }
+    return result;
+  }
   async active(): Promise<SyncTransaction | null> {
     const pointer = await this.vault.readInternal(`${ROOT}/active.json`);
     if (pointer === null || pointer === 'null') return null;

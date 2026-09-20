@@ -1,5 +1,12 @@
 # VaultBridge changelog
 
+## 1.1.12 — Old empty directory cleanup
+
+- Sync now removes empty source directories after file moves/deletions, deepest first. Recorded old paths in completed local transaction journals also allow a subsequent zero-file-change Sync to clean leftovers from earlier versions.
+- Cleanup moves empty directories into the transaction recovery area; it never recursively deletes them. Concurrent children are restored or retained in recovery, and cleanup errors prevent success/BASE finalization.
+- Unrelated empty directories, hidden/internal directories, ignored or excluded paths, and directories with any remaining children are preserved. Missing or damaged history does not authorize broad empty-folder deletion.
+- File identity, three-way resolution, Manifest format and file verification are unchanged. Preview and standalone Verify remain read-only.
+
 ## 1.1.10 — Blocked-plan diagnostics and mobile confirmation
 
 - Repository-level blocked previews show diagnostics and review/repair guidance, with Sync disabled and no synthetic operation counts or deletion confirmation.

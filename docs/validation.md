@@ -1,5 +1,14 @@
 # VaultBridge validation
 
+## 1.1.12
+
+- Empty-folder regression RED: four assertions failed before implementation (source parents remained, zero-change Sync did not repair leftovers, cleanup failure/concurrent-write safeguards never ran).
+- All 716 tests across 35 files, TypeScript, ESLint and the mobile-safe build passed. Seven new service tests cover nested cleanup, completed-journal repair, ignored/occupied folders, recovery, concurrent additions and damaged/fallback journals.
+- The isolated Windows Obsidian empty-folder suite passed six checks with zero console errors: actual disk/file-tree cleanup after remote rename and tombstone, zero-change upgrade repair without a new remote commit, hidden children, concurrent-child restoration and recovery. Mobile emulation used the production bundle.
+- The existing V1 Obsidian integration suite passed with zero console errors, including initialization, Push/Pull, conflicts, deletion confirmation, bootstrap, restart recovery, read-only Verify and both Legacy Adoption choices.
+- Desktop Obsidian's non-recursive rmdir rejected empty folders with EISDIR. The implementation therefore moves confirmed empty folders into transaction recovery and checks them again; it never recursively deletes a folder.
+- Public candidate/bundle audit and diff whitespace checks passed. Tests used synthetic repositories and disposable Vaults. Physical iPhone installation and verification remain pending.
+
 ## 1.1.11
 
 Changes: mobile file rows open a separate near-full-height dialog with independently scrolling content and visible Local/Remote actions; the main mobile Preview uses the available height. Conflict decisions can be applied individually or to all conflicts in the captured preview, including identity uncertainty. Selection only recompiles the plan; it never executes synchronization. Untracked local paths kept explicitly receive fresh identities, existing tombstones stay immutable, and no rename is inferred. Repository diagnostics and invalid destination paths still block execution.

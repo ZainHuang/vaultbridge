@@ -101,7 +101,10 @@ try {
   const localText = path => page.evaluate(path => app.vault.adapter.read(path), path);
   const state = () => page.evaluate(() => app.plugins.plugins['local-mirror-sync'].syncState.current());
 
-  if (process.argv.includes('--details')) {
+  if (process.argv.includes('--empty-folders')) {
+    const { verifyEmptyFolders } = await import('./empty-folder-ui-checks.mjs');
+    await verifyEmptyFolders({ page, remote, report, runDir, preview, sync, close, state, getUI: () => ui, WritableVault, LocalStateStore, SyncService, options });
+  } else if (process.argv.includes('--details')) {
     const { verifyMobileDetails } = await import('./mobile-details-ui-checks.mjs');
     await verifyMobileDetails({ page, remote, report, preview, sync, close, state, getUI: () => ui, screenshot });
   } else if (process.argv.includes('--keyboard')) {

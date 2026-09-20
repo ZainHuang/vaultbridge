@@ -25,6 +25,7 @@ import { isLegacyPublished, legacyTransactionChanged, recoverLegacyPublished } f
 import { validateManifestTree } from '../manifest/ManifestConsistency';
 import { manifestCommitParents } from '../manifest/RemoteManifestAudit';
 import { transactionIgnore, verifyLocal } from './LocalVerification';
+import { cleanupEmptyFolders } from './EmptyFolderCleanup';
 
 export interface SyncPreview extends StatefulPreviewResult { mode: SyncMode; adoptionChoice?: Resolution; canExecute: boolean; deletions: number; requiresDeleteConfirmation: boolean; scopeKey: string }
 interface Session { previewSteps: ActivitySnapshot['steps']; capture: Capture; execution: ExecutionPlan; options: PreviewOptions; manifest: SyncManifest | null; resolutions: Record<string, Resolution>; stateKey: string }
@@ -367,6 +368,8 @@ export class SyncService {
       const recovery = `${this.transactions.directory(t.id)}/quarantine/${gitBlobSha(new TextEncoder().encode(path))}`;
       await this.vault.apply(path, t.after[path] ? await this.transactions.blob(t.id, t.after[path]!) : null, t.before[path] ?? null, recovery);
     }
+    progress('Removing verified old empty folders');
+    await cleanupEmptyFolders(this.vault, this.transactions, t, ignore);
     progress(publishedBaseOnly ? 'Completing published BASE; subsequent Local changes remain for Preview' : 'Verifying local bytes before saving BASE');
     if (!publishedBaseOnly) { this.stage('Verify local'); await verifyLocal(this.vault, t, ignore, (processed, total) => this.stage('Verify local', processed, total)); }
     const finalHead = await github.head();

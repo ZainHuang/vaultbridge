@@ -23,6 +23,29 @@ export function obsidianSyncVault(vault: Vault): SyncVault {
   };
   return {
     ...obsidianVaultReader(vault),
+    removeEmptyFolder: async (path, recoveryPath) => {
+      assertPath(path); internal(recoveryPath);
+      if (path.startsWith('.') || path.split('/').some(part => part.startsWith('.'))) return;
+      if ((await adapter.stat(path))?.type !== 'folder') return;
+      const entries = await adapter.list(path);
+      if (entries.files.length || entries.folders.length) return;
+      // Some desktop adapters implement rmdir(false) with fs.rm, which rejects
+      // even empty directories. Move instead: no recursive deletion on any OS.
+      const destination = `${recoveryPath}/${crypto.randomUUID()}`;
+      await parents(destination);
+      await adapter.rename(path, destination);
+      const moved = await adapter.list(destination);
+      if (moved.files.length || moved.folders.length) {
+        // A writer added children between the listing and rename. Restore the
+        // entire folder when possible; otherwise keep all bytes in recovery.
+        if (!await adapter.exists(path)) await adapter.rename(destination, path);
+        else throw new PreviewError('LOCAL_APPLY', 'FOLDER_CHANGED', 'An old folder changed during cleanup. Concurrent contents are preserved in transaction empty-folders recovery. Review them before resuming.');
+      }
+      if ((await adapter.stat(path))?.type === 'folder') {
+        const current = await adapter.list(path);
+        if (!current.files.length && !current.folders.length) throw new PreviewError('LOCAL_APPLY', 'FOLDER_CLEANUP_FAILED', 'An old empty folder could not be removed. Resume to retry before reporting success.');
+      }
+    },
     readInternal: async path => { internal(path); return await adapter.exists(path) ? adapter.read(path) : null; },
     writeInternal: async (path, contents) => { internal(path); await parents(path); await adapter.write(path, contents); },
     removeInternal: async path => {

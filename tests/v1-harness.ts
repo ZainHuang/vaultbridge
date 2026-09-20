@@ -10,6 +10,8 @@ export class WritableVault extends MemoryVault implements SyncVault {
   async readInternal(path: string) { return this.internal.get(path) ?? null; }
   async writeInternal(path: string, text: string) { this.internal.set(path, text); }
   async removeInternal(path: string) { this.internal.delete(path); }
+  // This fixture derives folders from files and has no persistent empty folders.
+  async removeEmptyFolder(_path: string, _recoveryPath: string) { /* No empty directories in MemoryVault. */ }
   override async list(parent: string) {
     const listing = await super.list(parent);
     if (!parent && [...this.internal.keys()].some(p => p.startsWith('.local-mirror-sync/')) && !listing.folders.includes('.local-mirror-sync')) listing.folders.push('.local-mirror-sync');
