@@ -1,0 +1,58 @@
+{
+  "name": "vaultbridge",
+  "version": "1.1.9",
+  "private": true,
+  "description": "Stateful multi-device sync for Obsidian via GitHub, with three-way sync, conflict protection, recovery, and verification.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests --max-warnings 0",
+    "test": "vitest run --maxWorkers=4",
+    "test:property": "vitest run tests/stateful-property.test.ts",
+    "build": "node esbuild.config.mjs",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "fixtures": "node scripts/create-fixtures.mjs",
+    "test:obsidian": "node scripts/obsidian-smoke.mjs",
+    "test:obsidian:v1": "node scripts/obsidian-v1-smoke.mjs",
+    "test:obsidian:v11": "node scripts/obsidian-v1-smoke.mjs --v11",
+    "test:obsidian:v111": "node scripts/obsidian-v1-smoke.mjs --v111",
+    "test:obsidian:v112": "node scripts/obsidian-v1-smoke.mjs --v112",
+    "test:obsidian:v113": "node scripts/obsidian-v1-smoke.mjs --v113",
+    "test:obsidian:v114": "node scripts/obsidian-v1-smoke.mjs --v114",
+    "test:obsidian:activity": "node scripts/obsidian-v1-smoke.mjs --activity",
+    "test:obsidian:lifecycle": "node scripts/obsidian-v1-smoke.mjs --lifecycle",
+    "pretest": "npm run fixtures",
+    "test:obsidian:brand": "node scripts/obsidian-v1-smoke.mjs --brand",
+    "test:obsidian:dashboard": "node scripts/obsidian-v1-smoke.mjs --dashboard",
+    "test:obsidian:publish": "node scripts/obsidian-v1-smoke.mjs --publish",
+    "test:obsidian:manifest": "node scripts/obsidian-v1-smoke.mjs --manifest",
+    "audit:public": "node scripts/audit-public.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0",
+    "ignore": "7.0.9"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.5.1",
+    "esbuild": "0.28.2",
+    "eslint": "10.10.0",
+    "obsidian": "1.13.1",
+    "playwright": "1.63.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZainHuang/vaultbridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ZainHuang/vaultbridge/issues"
+  },
+  "homepage": "https://github.com/ZainHuang/vaultbridge#readme",
+  "engines": {
+    "node": ">=24"
+  }
+}

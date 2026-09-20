@@ -1,0 +1,52 @@
+# VaultBridge 1.1.9 validation
+
+Validated on 2026-09-20 with Node.js 24.16.0, npm 11.13.0 and Windows Obsidian 1.13.7. This release changes branding and publication packaging; the runtime diff from the previous stable source is eight string replacements across six files. No ID migration, storage-path change, dependency upgrade or synchronization-rule change was made.
+
+## Automated checks
+
+| Check | Result |
+| --- | --- |
+| TypeScript typecheck | Pass |
+| ESLint | Pass |
+| Unit / regression suite | 33 files, 684 tests passed, including 4 new branding/compatibility cases |
+| Dedicated property suite | 100 tests passed (also included in the full suite) |
+| Production build | Pass; Obsidian is the only external runtime dependency |
+| Clean public-source install | `npm ci` and `npm run check` passed without private/generated files; npm reported 0 vulnerabilities |
+| Public-file and bundle scan | No credential/private-path findings in the publication set |
+| Install package | Exactly three runtime files under the compatible plugin directory; ZIP entries and SHA-256 checked |
+
+The new regression suite was run before the rename: the VaultBridge display-name assertion failed while three compatibility cases passed. After the minimal rename, all four passed. It covers existing SecretStorage/fallback credentials, BASE/device identity, Manifest and interrupted Recovery across reload in default and custom config directories.
+
+## Real application integration
+
+All 13 integration suites completed their fixture checks, totaling **80 checks**. Final suite runs recorded zero console errors:
+
+| npm script | Checks |
+| --- | ---: |
+| `test:obsidian` | 14 |
+| `test:obsidian:v1` | 13 |
+| `test:obsidian:v11` | 6 |
+| `test:obsidian:v111` | 6 |
+| `test:obsidian:v112` | 7 |
+| `test:obsidian:v113` | 11 |
+| `test:obsidian:v114` | 3 |
+| `test:obsidian:activity` | 6 |
+| `test:obsidian:lifecycle` | 2 |
+| `test:obsidian:dashboard` | 4 |
+| `test:obsidian:publish` | 3 |
+| `test:obsidian:manifest` | 2 |
+| `test:obsidian:brand` | 3 |
+
+The original Preview suite explicitly disabled its optional public GitHub live read with `LMS_SKIP_LIVE_GITHUB=1`, so it reports `passed_with_live_read_pending`; all 14 fixture checks passed. The V1.1 suite initially reported three stackless `illegal access` page errors around a Settings popout close. An unchanged rerun passed with zero console errors; the first failure remains in local evidence and was not filtered out. No production workaround was added for that intermittent result.
+
+The suites use isolated synthetic Vaults, fresh profiles and local HTTP GitHub fixtures. They exercise loading/empty states, Preview, settings, Auto Sync, initialization/adoption, conflict handling, Verify, Recovery, interrupted publication, reload, local history and Dashboard caching. Desktop branding screenshots and 390px activity/Dashboard screenshots were visually reviewed. The branding integration confirms original command IDs and persisted settings/BASE survive a production plugin reload.
+
+## Publication audit
+
+Only reviewed source, synthetic tests/generators, maintained documentation and build/CI metadata are included. The old local reports and operational scripts referencing a personal Vault are preserved locally and excluded. Test profiles, real/private artifacts, transaction/recovery data, generated Vaults and dependency directories are excluded as well.
+
+A broader local credential-pattern pass covered 13,025 project files outside dependency/Git/bundle archives without finding a GitHub token or private key. Assignment-like strings in public tests were manually checked: they are inert synthetic fixtures, not usable credentials. Scanners report paths/rules only and do not print matched secrets. Automated scanning supplements review; it is not a proof that arbitrary future files are safe.
+
+## Acceptance limits
+
+Physical iPhone/Android tests and real multi-device synchronization against a private notes repository were not performed for this release. Mobile evidence is bundle validation and Obsidian emulation. Publishing the plugin's source and release assets to GitHub is a separate operation and does not establish live note-sync acceptance. No personal Vault was installed into or changed by these checks.

@@ -1,0 +1,46 @@
+# Dependencies and generated bundles (distributed through GitHub Releases)
+/node_modules/
+/main.js
+/dist/
+/coverage/
+*.tsbuildinfo
+*.log
+
+# Device data, private diagnostics, generated fixtures and screenshots
+/.test-profile/
+/test-vault/
+/test-repository/
+/test-results/
+/artifacts/
+**/.obsidian/
+**/.local-mirror-sync/
+**/.sync-history/
+.env
+.env.*
+*.pem
+*.key
+**/data.json
+**/sync-state.json
+**/device-state.json
+**/product-state.json
+
+# Historical local reports contain personal paths and operational evidence.
+# Preserve them on disk; publish only maintained user/developer documentation.
+/*REPORT.md
+/PUBLISH_LIFECYCLE_ROOT_CAUSE.md
+/TEST_PLAN.md
+/SYNC_SEMANTICS.md
+/INTERNAL_CHANGELOG.md
+/docs/*
+!/docs/compatibility.md
+!/docs/validation.md
+
+# One-off diagnostics can target a real Vault; never publish or run from CI.
+/scripts/audit-*.mjs
+!/scripts/audit-public.mjs
+/scripts/manifest-live-diagnose.mjs
+/scripts/manifest-maintenance.mjs
+/scripts/manifest-maintenance-entry.ts
+/scripts/manifest-repair-report.mjs
+/scripts/local-verify-diagnose.mjs
+/scripts/published-recovery-preview.mjs
