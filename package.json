@@ -1,6 +1,6 @@
 {
   "name": "vaultbridge",
-  "version": "1.1.13",
+  "version": "1.1.14",
   "private": true,
   "description": "Stateful multi-device sync for Obsidian via GitHub, with three-way sync, conflict protection, recovery, and verification.",
   "type": "module",

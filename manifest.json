@@ -1,10 +1,10 @@
 {
   "id": "local-mirror-sync",
   "name": "VaultBridge",
-  "version": "1.1.13",
+  "version": "1.1.14",
   "minAppVersion": "1.6.0",
   "description": "Stateful multi-device sync for Obsidian via GitHub, with three-way sync, conflict protection, recovery, and verification.",
-  "author": "VaultBridge contributors",
+  "author": "ZainHuang",
   "isDesktopOnly": false,
   "authorUrl": "https://github.com/ZainHuang"
 }

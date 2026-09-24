@@ -1,5 +1,9 @@
 # VaultBridge changelog
 
+## 1.1.14 — Correct plugin author
+
+- Obsidian plugin author is now shown as ZainHuang. Sync behavior and stored data are unchanged.
+
 ## 1.1.13 — Focused Preview and confirmation dialog
 
 - Preview lists only Push, Pull and Conflict decisions, ten per page. Unchanged files remain in the plan for verification but are omitted from the displayed rows and category buttons.
