@@ -10,12 +10,13 @@ export async function verifyV112({ page, remote, report, runDir, preview, close,
   };
   remote.external({ 'old.md': 'old remote note' });
   await preview(); await getUI().getByRole('button', { name: 'Use Local', exact: true }).click();
+  await getUI().getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
   await getUI().getByRole('textbox', { name: 'Adoption confirmation' }).fill('USE LOCAL');
   await page.evaluate(() => {
     const p = app.plugins.plugins['local-mirror-sync']; window.__saveState = p.syncState.save.bind(p.syncState);
     p.syncState.save = async () => { throw new Error('fixture power loss before BASE'); };
   });
-  await getUI().getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
+  await getUI().getByRole('button', { name: 'Confirm & Adopt', exact: true }).click();
   await getUI().getByRole('button', { name: 'Review Recovery', exact: true }).waitFor(); await close();
   await page.evaluate(async () => {
     const p = app.plugins.plugins['local-mirror-sync']; p.syncState.save = window.__saveState;

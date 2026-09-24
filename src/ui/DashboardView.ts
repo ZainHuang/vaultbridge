@@ -52,8 +52,8 @@ export class DashboardView extends ItemView {
     if (revision !== this.revision || !this.contentEl.isConnected) return;
     const el = document.createElement('div');
     el.createEl('h1', { text: this.getDisplayText() });
-    const history = this.plugin.product.cachedHistory();
     if (this.historyOnly) {
+      const history = this.plugin.product.cachedHistory();
       el.createEl('p', { text: 'Saved on this device in .sync-history/. Latest 100 verified transactions.', cls: 'lms-muted' });
       el.createEl('button', { text: 'Open Dashboard' }).onclick = () => { void this.plugin.openDashboard(); };
       this.history(el, history); this.commitView(el); return;
@@ -98,7 +98,6 @@ export class DashboardView extends ItemView {
       row.createEl('span', { text: `${device.deviceType} · Generation ${device.lastGeneration ?? 'Not synced'}` });
       row.createEl('span', { text: `Last sync: ${time(device.lastSyncAt)}` });
     }
-    el.createEl('h2', { text: 'Sync History' }); this.history(el, history.slice(0, 5));
     this.commitView(el);
   }
   private commitView(next: HTMLElement): void {

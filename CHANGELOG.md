@@ -1,5 +1,12 @@
 # VaultBridge changelog
 
+## 1.1.13 — Focused Preview and confirmation dialog
+
+- Preview lists only Push, Pull and Conflict decisions, ten per page. Unchanged files remain in the plan for verification but are omitted from the displayed rows and category buttons.
+- Clicking **Sync & Verify** now opens a separate dialog for exact `DELETE N` confirmation when the existing threshold requires it. Legacy **Adopt & Verify** collects its `USE LOCAL` / `USE REMOTE` phrase in the same way. Cancel leaves Preview intact and performs no sync.
+- Dashboard no longer repeats recent History records at the bottom. The dedicated Sync History view and its button remain available.
+- File decisions, deletion thresholds, BASE, Manifest, Recovery and Three-Way Sync semantics are unchanged.
+
 ## 1.1.12 — Old empty directory cleanup
 
 - Sync now removes empty source directories after file moves/deletions, deepest first. Recorded old paths in completed local transaction journals also allow a subsequent zero-file-change Sync to clean leftovers from earlier versions.

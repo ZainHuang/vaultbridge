@@ -1,5 +1,12 @@
 # VaultBridge validation
 
+## 1.1.13
+
+- A new isolated Obsidian integration test first failed on the old Dashboard History section. After implementation it passed change-only Preview rows, ten-row pagination, deletion confirmation after Sync click, exact phrase/cancel safety, and the separate History view with zero Console errors.
+- `npm run check` passed all 716 tests across 35 files, TypeScript, ESLint and the mobile-safe build. The read-only Preview, V1 execution, Dashboard, V1.1, mobile keyboard and legacy Recovery integration suites passed. The anonymous live GitHub read in the standalone Preview suite remained HTTP 403; its isolated fixture checks passed.
+- Mobile keyboard emulation checked the new confirmation dialog under viewport shrink, native keyboard height and safe areas. The physical iPhone remains unverified.
+- UI-only changes leave the three-way planner, delete threshold, Manifest, BASE and Recovery protocol intact.
+
 ## 1.1.12
 
 - Empty-folder regression RED: four assertions failed before implementation (source parents remained, zero-change Sync did not repair leftovers, cleanup failure/concurrent-write safeguards never ran).

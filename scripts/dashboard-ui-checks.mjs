@@ -44,13 +44,15 @@ export async function verifyDashboard({ page, remote, report, runDir, preview, s
   // A real state change must still update the cached page automatically.
   await preview(); await sync(); await close();
   await dashboard.locator('.lms-dashboard-health').getByText('Healthy', { exact: true }).waitFor();
-  assert.equal(await dashboard.locator('.lms-history-record').count(), 1);
+  assert.equal(await dashboard.locator('.lms-history-record').count(), 0);
+  assert.equal(await dashboard.getByRole('heading', { name: 'Sync History', exact: true }).count(), 0);
   await dashboard.locator('.lms-recovery-panel').getByText('Healthy', { exact: true }).waitFor();
   await page.evaluate(() => app.plugins.plugins['local-mirror-sync'].openDashboard(true));
   await surface('.lms-dashboard');
   await getUI().getByRole('heading', { name: 'Sync History', exact: true }).waitFor();
   const history = await getUI().evaluate(async () => {
-    const p = app.plugins.plugins['local-mirror-sync']; const root = document.querySelector('.lms-dashboard');
+    const p = app.plugins.plugins['local-mirror-sync'];
+    const root = [...document.querySelectorAll('.lms-dashboard')].find(el => el.querySelector('h1')?.textContent === 'Sync History');
     const row = root.querySelector('.lms-history-record'); p.refreshDashboard(); await new Promise(resolve => setTimeout(resolve, 100));
     return { sameRow: row === root.querySelector('.lms-history-record'), count: root.querySelectorAll('.lms-history-record').length };
   });

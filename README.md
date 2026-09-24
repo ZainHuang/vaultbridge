@@ -156,11 +156,11 @@ Token 优先使用 Obsidian SecretStorage；不可用时设置页会提示保存
 
 ## Manual Sync · 手动同步
 
-运行 **VaultBridge: Sync (review first)**，先看推送、拉取、删除、重命名及冲突，再点击 **Sync & Verify**。超过 Delete Safety Threshold 的移除路径要求准确输入 `DELETE N`；默认阈值 20，重命名源路径也计入。
+运行 **VaultBridge: Sync (review first)**，先看推送、拉取、删除、重命名及冲突；列表仅显示变动文档，每页 10 条。再点击 **Sync & Verify**。超过 Delete Safety Threshold 的移除路径会弹出确认窗口，要求准确输入 `DELETE N`；默认阈值 20，重命名源路径也计入。
 
 建议开始编辑前检查远端，结束后再同步。等待同步结束再关闭应用；预览后内容改变就重新 Preview。
 
-**Open Dashboard** 显示缓存的仓库、文件数、设备、健康状态和 Recovery。**Sync History** 显示本机最近 100 条已验证事务，旧 JSON 仍保留。打开这两个页面不请求 GitHub，显示的不是实时在线状态；运行 Preview 才检查远端。
+**Open Dashboard** 显示缓存的仓库、文件数、设备、健康状态和 Recovery。独立的 **Sync History** 页面显示本机最近 100 条已验证事务，旧 JSON 仍保留。打开这两个页面不请求 GitHub，显示的不是实时在线状态；运行 Preview 才检查远端。
 
 ## Auto Sync · 自动同步
 

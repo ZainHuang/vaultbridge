@@ -115,7 +115,9 @@ try {
   assert.deepEqual(Object.fromEntries(Object.entries((await plan()).counts).filter(([, count]) => count)), {
     PUSH_ADD: 30, PUSH_UPDATE: 20, PUSH_DELETE: 20, PUSH_RENAME: 20, PULL_ADD: 20, UNCHANGED: 6,
   });
-  for (const label of ['Push 90', 'Pull 20', 'Conflict 0', 'Bootstrap 0', 'Unchanged 6']) assert(await page.getByRole('button', { name: label, exact: true }).isVisible());
+  for (const label of ['Push 90', 'Pull 20', 'Conflict 0', 'Bootstrap 0']) assert(await page.getByRole('button', { name: label, exact: true }).isVisible());
+  assert.equal(await page.getByRole('button', { name: 'Unchanged 6', exact: true }).count(), 0);
+  assert.equal(await page.locator('.lms-entry').count(), 10);
   assert((await page.locator('.lms-subtitle').innerText()).includes('Stateful Three-Way Sync'));
   assert(!(await page.locator('.lms-modal').innerText()).includes('Local Primary'));
   assert(await page.locator('.lms-warning').isVisible());
@@ -130,9 +132,9 @@ try {
   await page.getByRole('searchbox').fill('no-such-file');
   assert(await page.getByText('No files match this filter.', { exact: true }).isVisible());
   await page.getByRole('button', { name: 'Refresh Preview', exact: true }).click(); await ready();
-  await page.getByRole('button', { name: 'Next 100', exact: true }).click();
-  assert.equal(await page.locator('.lms-entry').count(), 16);
-  report.checks.push('Group filter, identity/hash details, old-path search, empty filter, refresh and 100-row pagination');
+  await page.getByRole('button', { name: 'Next 10', exact: true }).click();
+  assert.equal(await page.locator('.lms-entry').count(), 10);
+  report.checks.push('Group filter, identity/hash details, old-path search, empty filter, refresh and ten-row pagination');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Push 90', exact: true }).click();

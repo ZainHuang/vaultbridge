@@ -16,8 +16,9 @@ export async function verifyMobileKeyboard({ page, remote, report, preview, clos
   await close(); await preview();
   await ui.setViewportSize({ width: 390, height: 844 });
   await ui.getByRole('button', { name: 'Use Local', exact: true }).click();
+  await ui.getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
   const input = ui.getByRole('textbox', { name: 'Adoption confirmation' });
-  const execute = ui.getByRole('button', { name: 'Adopt & Verify', exact: true });
+  const execute = ui.getByRole('button', { name: 'Confirm & Adopt', exact: true });
   assert(await execute.isDisabled());
   await input.evaluate(el => el.focus());
   const setKeyboard = async (height, offsetTop = 0, nativeHeight = 0, viewportEvent = true) => {
@@ -32,7 +33,7 @@ export async function verifyMobileKeyboard({ page, remote, report, preview, clos
   const visible = async (bottom, top = 0) => {
     const bounds = await ui.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, width: r.width }; };
-      return { input: box('.lms-confirm-input'), footer: box('.lms-footer'), modal: box('.lms-modal'), overflow: [...document.querySelectorAll('.lms-modal, .modal-content')].some(el => el.scrollWidth > el.clientWidth + 1) };
+      return { input: box('.lms-confirm-input'), footer: box('.lms-confirm-modal .lms-footer'), modal: box('.lms-confirm-modal'), overflow: [...document.querySelectorAll('.lms-modal, .modal-content')].some(el => el.scrollWidth > el.clientWidth + 1) };
     });
     report.keyboardBounds ??= []; report.keyboardBounds.push({ top, bottom, ...bounds });
     assert(bounds.input.top >= top && bounds.input.bottom <= bottom, `Confirmation obscured: ${JSON.stringify(bounds)}`);
@@ -78,8 +79,9 @@ export async function verifyMobileKeyboard({ page, remote, report, preview, clos
   await preview();
   assert.equal(await ui.locator('.lms-viewport-container').count(), 0);
   await ui.getByRole('button', { name: 'Use Remote', exact: true }).click();
+  await ui.getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
   await ui.getByRole('textbox', { name: 'Adoption confirmation' }).fill('USE REMOTE');
-  assert.equal(await ui.locator('.lms-execute').isDisabled(), false);
+  assert.equal(await ui.getByRole('button', { name: 'Confirm & Adopt', exact: true }).isDisabled(), false);
   await screenshot('keyboard-desktop-regression');
   await close();
   assert.deepEqual(await state(), before);

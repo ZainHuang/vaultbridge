@@ -101,7 +101,10 @@ try {
   const localText = path => page.evaluate(path => app.vault.adapter.read(path), path);
   const state = () => page.evaluate(() => app.plugins.plugins['local-mirror-sync'].syncState.current());
 
-  if (process.argv.includes('--empty-folders')) {
+  if (process.argv.includes('--preview-ux')) {
+    const { verifyPreviewUX } = await import('./preview-ux-ui-checks.mjs');
+    await verifyPreviewUX({ page, remote, report, runDir, preview, close, surface, getUI: () => ui, state });
+  } else if (process.argv.includes('--empty-folders')) {
     const { verifyEmptyFolders } = await import('./empty-folder-ui-checks.mjs');
     await verifyEmptyFolders({ page, remote, report, runDir, preview, sync, close, state, getUI: () => ui, WritableVault, LocalStateStore, SyncService, options });
   } else if (process.argv.includes('--details')) {
@@ -169,7 +172,10 @@ try {
   assert.equal(await localText('renamed.md'), '# Remote conflict'); report.checks.push('Conflict blocks execution; pinned content inspection and explicit REMOTE resolution work');
   await close(); bVault.files.delete('renamed.md'); await bState.recordDelete('renamed.md'); await bRun();
   await page.evaluate(() => { app.plugins.plugins['local-mirror-sync'].settings.deleteSafetyThreshold = 0; }); await preview();
-  await ui.getByRole('textbox', { name: 'Delete confirmation' }).fill('DELETE 1'); await screenshot('06-mobile-delete-confirmation'); await sync();
+  await ui.getByRole('button', { name: 'Sync & Verify', exact: true }).click();
+  await ui.getByRole('textbox', { name: 'Delete confirmation' }).fill('DELETE 1'); await screenshot('06-mobile-delete-confirmation');
+  await ui.getByRole('button', { name: 'Confirm & Sync', exact: true }).click();
+  await ui.getByText('Sync verified. BASE updated successfully.').waitFor();
   assert.equal(await page.evaluate(() => app.vault.adapter.exists('renamed.md')), false); report.checks.push('Remote tombstone deletes real local file only after exact threshold confirmation');
   await close(); bVault.files.set('fresh.md', new TextEncoder().encode('# Bootstrap')); await bRun();
   // Only this generated disposable fixture Vault is cleared, using Obsidian's file API.
@@ -233,20 +239,24 @@ try {
     await ui.getByRole('button', { name: choice, exact: true }).click();
     assert.equal(await ui.getByRole('button', { name: 'Conflict 0', exact: true }).count(), 1);
     assert((await ui.locator('.lms-adoption-impact').innerText()).includes(side === 'local' ? 'Delete remote 1' : 'Remove from active Vault 1'));
+    assert.equal(await ui.locator('.lms-execute').isDisabled(), false);
+    await ui.getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
     const confirmation = ui.getByRole('textbox', { name: 'Adoption confirmation', exact: true });
-    await confirmation.fill(phrase.toLowerCase()); assert(await ui.locator('.lms-execute').isDisabled());
-    await confirmation.fill(phrase); assert.equal(await ui.locator('.lms-execute').isDisabled(), false);
-    // Switching authority must invalidate the typed confirmation and recalculate impact.
+    await confirmation.fill(phrase.toLowerCase()); assert(await ui.getByRole('button', { name: 'Confirm & Adopt', exact: true }).isDisabled());
+    await confirmation.fill(phrase); assert.equal(await ui.getByRole('button', { name: 'Confirm & Adopt', exact: true }).isDisabled(), false);
+    await ui.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // Switching authority recalculates impact; reopening requires fresh text.
     await ui.getByRole('button', { name: side === 'local' ? 'Use Remote' : 'Use Local', exact: true }).click();
-    assert.equal(await ui.getByRole('textbox', { name: 'Adoption confirmation' }).inputValue(), '');
-    assert(await ui.locator('.lms-execute').isDisabled());
+    assert.equal(await ui.getByRole('textbox', { name: 'Adoption confirmation' }).count(), 0);
     await ui.getByRole('button', { name: choice, exact: true }).click();
+    await ui.getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
+    assert.equal(await ui.getByRole('textbox', { name: 'Adoption confirmation' }).inputValue(), '');
     await ui.getByRole('textbox', { name: 'Adoption confirmation' }).fill(phrase);
-    assert(await ui.locator('.lms-modal').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+    assert(await ui.locator('.lms-confirm-modal').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     assert(remote.calls.slice(callCount).every(c => c.method === 'GET'));
     await ui.locator('.lms-execute').scrollIntoViewIfNeeded();
     await screenshot(`13-${side}-adoption-confirm`);
-    await ui.getByRole('button', { name: 'Adopt & Verify', exact: true }).click();
+    await ui.getByRole('button', { name: 'Confirm & Adopt', exact: true }).click();
     await ui.waitForFunction(() => document.querySelector('.lms-error') || document.body.textContent.includes('Sync verified. BASE updated successfully.'), null, { timeout: 30000 });
     assert.equal(await ui.locator('.lms-error').count(), 0, await ui.locator('.lms-modal').innerText());
     assert.equal((await state()).baseManifest.generation, 1);

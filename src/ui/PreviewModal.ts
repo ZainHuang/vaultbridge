@@ -3,6 +3,7 @@ import { PreviewError, safeError } from '../errors';
 import { recoveryActions, type RecoveryAction } from './RecoveryUI';
 import { keepModalAboveKeyboard } from './MobileModalViewport';
 import { FileDetailsModal } from './FileDetailsModal';
+import { SyncConfirmationModal } from './SyncConfirmationModal';
 import type { RepositoryTarget } from '../github/types';
 import type { SyncDecision, ThreeWayPlan } from '../sync/planner/SyncDecision';
 import { PREVIEW_GROUPS, decisionGroup, previewGroups, canExecutePreview, repositoryBlocked, type PreviewGroup } from './PreviewModel';
@@ -12,6 +13,7 @@ import type { SyncPreview } from '../sync/execution/SyncService';
 import type { Resolution } from '../sync/execution/ExecutionPlan';
 
 type RunPreview = (progress: Progress, signal: AbortSignal) => Promise<StatefulPreviewResult>;
+const PAGE_SIZE = 10;
 export interface SyncActions {
   execute(result: SyncPreview, progress: Progress, signal: AbortSignal, confirmation: string): Promise<void>;
   resolve(result: SyncPreview, key: string, choice: Resolution): SyncPreview;
@@ -34,6 +36,7 @@ export class PreviewModal extends Modal {
   private executing = false;
   private releaseViewport?: () => void;
   private fileModal?: FileDetailsModal;
+  private confirmationModal?: SyncConfirmationModal;
   private choiceNotice?: string;
 
   constructor(app: App, private readonly target: RepositoryTarget & { deleteSafetyThreshold?: number }, private readonly run: RunPreview, private readonly actions?: SyncActions,
@@ -48,6 +51,7 @@ export class PreviewModal extends Modal {
 
   onClose(): void {
     this.fileModal?.close();
+    this.confirmationModal?.close();
     this.releaseViewport?.();
     if (!this.executing) this.controller?.abort();
     this.contentEl.empty();
@@ -66,6 +70,7 @@ export class PreviewModal extends Modal {
 
   private async load(): Promise<void> {
     this.fileModal?.close();
+    this.confirmationModal?.close();
     this.choiceNotice = undefined;
     this.controller?.abort();
     const controller = new AbortController();
@@ -195,24 +200,17 @@ export class PreviewModal extends Modal {
     const footer = el.createDiv({ cls: 'lms-footer' });
     if (this.result && this.actions) {
       const prepared = this.result;
-      let confirmation: HTMLInputElement | undefined;
       const requiredConfirmation = !canExecutePreview(prepared) ? '' : prepared.adoptionChoice ? `USE ${prepared.adoptionChoice.toUpperCase()}`
         : prepared.requiresDeleteConfirmation && prepared.deletions > (this.target.deleteSafetyThreshold ?? 20) ? `DELETE ${prepared.deletions}` : '';
-      if (requiredConfirmation) {
-        const label = el.createEl('label', { text: prepared.adoptionChoice ? `Type ${requiredConfirmation} to confirm the adoption impact above` : `Type ${requiredConfirmation} to approve removed paths (including rename sources)`, cls: 'lms-search-label' });
-        footer.before(label);
-        confirmation = label.createEl('input', { cls: 'lms-confirm-input', attr: { 'aria-label': prepared.adoptionChoice ? 'Adoption confirmation' : 'Delete confirmation', autocomplete: 'off', spellcheck: 'false' } });
-      }
       const execute = footer.createEl('button', { text: prepared.mode === 'ADOPT' ? 'Adopt & Verify' : 'Sync & Verify', cls: 'mod-cta lms-execute' });
-      const enable = () => { execute.disabled = !canExecutePreview(prepared) || !!requiredConfirmation && confirmation?.value !== requiredConfirmation; };
-      enable(); if (confirmation) confirmation.oninput = enable;
-      execute.onclick = async () => {
-        if (this.executing || execute.disabled || !canExecutePreview(prepared)) return;
+      execute.disabled = !canExecutePreview(prepared);
+      const run = async (confirmation: string) => {
+        if (this.executing || execute.disabled || !canExecutePreview(prepared) || this.result !== prepared || this.controller?.signal.aborted) return;
         this.executing = true;
         this.contentEl.querySelectorAll('button, input').forEach(e => { (e as HTMLButtonElement).disabled = true; });
         const status = el.createEl('p', { text: 'Rechecking Preview…', cls: 'lms-status', attr: { role: 'status', 'aria-live': 'polite' } });
         try {
-          await this.actions!.execute(prepared, text => status.setText(text), this.controller!.signal, confirmation?.value ?? '');
+          await this.actions!.execute(prepared, text => status.setText(text), this.controller!.signal, confirmation);
           this.header();
           this.contentEl.createEl('p', { text: 'Sync verified. BASE updated successfully.', cls: 'lms-status' });
           this.contentEl.createEl('button', { text: 'Preview again' }).onclick = () => { void this.load(); };
@@ -225,6 +223,17 @@ export class PreviewModal extends Modal {
           if (pending) recoveryActions(this.contentEl, action => this.actions!.recover(action));
           else this.contentEl.createEl('button', { text: 'Refresh Preview' }).onclick = () => { void this.load(); };
         } finally { this.executing = false; }
+      };
+      execute.onclick = () => {
+        if (this.executing || execute.disabled || !canExecutePreview(prepared) || this.result !== prepared) return;
+        if (!requiredConfirmation) { void run(''); return; }
+        if (this.confirmationModal) return;
+        const message = prepared.adoptionChoice
+          ? `Review the selected authority: ${prepared.plan.counts.PUSH_DELETE} remote and ${prepared.plan.counts.PULL_DELETE} local deletions. A backup is created before adoption.`
+          : `Approve ${prepared.plan.counts.PUSH_DELETE} remote and ${prepared.plan.counts.PULL_DELETE} local deletions, including rename sources.`;
+        const modal = new SyncConfirmationModal(this.app, requiredConfirmation, message, !!prepared.adoptionChoice,
+          phrase => { void run(phrase); }, () => { if (this.confirmationModal === modal) this.confirmationModal = undefined; if (execute.isConnected) execute.focus({ preventScroll: true }); });
+        this.confirmationModal = modal; modal.open();
       };
     }
     const refresh = footer.createEl('button', { text: 'Refresh Preview' });
@@ -241,20 +250,20 @@ export class PreviewModal extends Modal {
 
   private renderRows(): void {
     if (!this.plan) return;
-    const entries = this.plan.entries.filter(entry => (this.filter === 'ALL' || decisionGroup(entry.category) === this.filter)
+    const entries = this.plan.entries.filter(entry => decisionGroup(entry.category) !== 'Unchanged' && (this.filter === 'ALL' || decisionGroup(entry.category) === this.filter)
       && `${entry.path}\n${entry.oldPath ?? ''}`.toLocaleLowerCase().includes(this.query));
-    const start = this.page * 100;
+    const start = this.page * PAGE_SIZE;
     this.rowsEl.empty();
-    this.countEl.setText(entries.length ? `${start + 1}–${Math.min(start + 100, entries.length)} of ${entries.length} entries` : '0 entries');
+    this.countEl.setText(entries.length ? `${start + 1}–${Math.min(start + PAGE_SIZE, entries.length)} of ${entries.length} entries` : '0 entries');
     if (!entries.length) this.rowsEl.createEl('p', { text: 'No files match this filter.', cls: 'lms-empty' });
-    entries.slice(start, start + 100).forEach(entry => this.renderEntry(entry));
-    if (entries.length > 100) {
+    entries.slice(start, start + PAGE_SIZE).forEach(entry => this.renderEntry(entry));
+    if (entries.length > PAGE_SIZE) {
       const pager = this.rowsEl.createDiv({ cls: 'lms-pager' });
-      const previous = pager.createEl('button', { text: 'Previous 100' });
+      const previous = pager.createEl('button', { text: 'Previous 10' });
       previous.disabled = this.page === 0;
       previous.onclick = () => { this.page--; this.renderRows(); this.rowsEl.scrollTop = 0; };
-      const next = pager.createEl('button', { text: 'Next 100' });
-      next.disabled = start + 100 >= entries.length;
+      const next = pager.createEl('button', { text: 'Next 10' });
+      next.disabled = start + PAGE_SIZE >= entries.length;
       next.onclick = () => { this.page++; this.renderRows(); this.rowsEl.scrollTop = 0; };
     }
   }

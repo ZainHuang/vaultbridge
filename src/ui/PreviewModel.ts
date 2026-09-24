@@ -7,8 +7,8 @@ export function repositoryBlocked(plan: Pick<ThreeWayPlan, 'status'>): boolean {
   return !['READY', 'INITIALIZE_REMOTE_FROM_LOCAL', 'BOOTSTRAP_FROM_REMOTE',
     'LEGACY_REMOTE_REQUIRES_ADOPTION', 'BOOTSTRAP_CONFLICT_LOCAL_NOT_EMPTY'].includes(plan.status);
 }
-export const PREVIEW_GROUPS = ['Push', 'Pull', 'Conflict', 'Bootstrap', 'Unchanged'] as const;
-export type PreviewGroup = typeof PREVIEW_GROUPS[number];
+export const PREVIEW_GROUPS = ['Push', 'Pull', 'Conflict', 'Bootstrap'] as const;
+export type PreviewGroup = typeof PREVIEW_GROUPS[number] | 'Unchanged';
 export function decisionGroup(category: DecisionCategory): PreviewGroup {
   if (category.startsWith('PUSH_')) return 'Push';
   if (category.startsWith('PULL_')) return 'Pull';

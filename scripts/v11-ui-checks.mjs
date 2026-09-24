@@ -5,8 +5,8 @@ export async function verifyV11({ page, remote, report, runDir, preview, sync, c
   const capture = async name => { await page.screenshot({ path: join(runDir, `${name}.png`) }); report.screenshots.push(`${name}.png`); };
   const dashboard = async () => { await page.evaluate(() => app.commands.executeCommandById('local-mirror-sync:dashboard')); await page.locator('.lms-dashboard:visible').waitFor(); };
   await dashboard(); assert.match(await page.locator('.lms-dashboard:visible').innerText(), /Sync Required/);
-  assert.match(await page.locator('.lms-dashboard:visible').innerText(), /No verified sync history/);
-  await capture('v11-01-empty-dashboard'); report.checks.push('Dashboard initial state and empty history are visible before any sync');
+  assert.doesNotMatch(await page.locator('.lms-dashboard:visible').innerText(), /No verified sync history/);
+  await capture('v11-01-empty-dashboard'); report.checks.push('Dashboard initial state omits the History section before any sync');
   await page.evaluate(() => { app.setting.open(); app.setting.openTabById('local-mirror-sync'); });
   const findSettings = async () => {
     for (let n = 0; n < 100; n++) {
@@ -58,7 +58,11 @@ export async function verifyV11({ page, remote, report, runDir, preview, sync, c
   report.checks.push('Real rename preserves identity; 21 additions stop at manual confirmation without publication');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { document.body.classList.add('emulate-mobile'); app.workspace.leftSplit.collapse(); app.workspace.rightSplit.collapse(); });
-  await dashboard(); assert(await page.locator('.lms-dashboard:visible').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+  await dashboard(); await page.waitForFunction(() => {
+    const el = [...document.querySelectorAll('.lms-dashboard')].find(el => el.getBoundingClientRect().width > 0);
+    return el && el.scrollWidth <= el.clientWidth + 1;
+  });
+  assert(await page.locator('.lms-dashboard:visible').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
   await capture('v11-06-mobile-dashboard');
   await page.getByRole('button', { name: 'Review in Preview', exact: true }).click();
   let reviewOpened = false;
